@@ -1,0 +1,67 @@
+:title Introduction to Graphs
+
+## Definitions
+
+#callout {
+    :title Definition (Graph)
+
+    A **graph** is a pair of sets $(V,E)$ which are defined as follows:
+    #ul {
+        - !V is a set of objects. Each element !V is called a *vertex* of the graph, and !V itself is called the set of *vertices* of the graph.
+        - !E is a set of pairs of objects from !V where each pair $\{v_1,v_2\}$ is a set consisting of two distinct vertices and is called an *edge* of the graph. Order does not matter, that is, $\{v_1,v_@\}\equiv \{v_2,v_1\}$.
+    }
+}
+
+### Example
+
+#diagram {
+    :width 50%
+    :position centered
+
+    #script {
+        let d = new Diagram({
+            bounds: new Bounds(-10, 10, -10, 10)
+        });
+
+        let bubble = (content, at) => {
+            d.circle({
+                at: at,
+                radius: 2,
+                style: {
+                    fill: colors.white,
+                    border: colors.black,
+                    bwidth: 1
+                }
+            });
+            d.text({
+                text: content
+            });
+        }
+
+        bubble("A", vec2(-2, 2));
+        bubble("B", vec2(2, 2));
+        bubble("C", vec2(2, -2));
+        bubble("D", vec2(-2, -2));
+    }
+}
+The above graph would be denoted $G=(V,E)$ where
+$$
+    V=\{A,B,C,D\}
+$$
+and
+$$
+    E=\{\{A,B\},\{A,D\},\{A,C\},\{B,C\},\{D,C\}\}
+$$
+
+#callout {
+    :title Definition (Adjacency)
+
+    Let $G=(V,E)$.
+
+    Let $v_1,v_@\in V$.
+    
+    !v_1 and !v_2 are called **adjacent** if and only if there exists
+    $$
+        \{v_1,v_2\}\in E.
+    $$
+}
