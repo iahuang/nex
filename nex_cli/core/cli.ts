@@ -15,19 +15,21 @@ export class ArgParser {
         this._argumentSchema = [];
     }
 
-    addArgument(arg: Argument) {
+    addArgument(arg: Argument): void {
         this._argumentSchema.push({ ...arg }); // clone argument object, just in case we were passed a mutable reference for some reason
     }
 
-    buildHelpString() {
-        /*
-            Generate and return the help string, that is, what should be printed to stdout when
-            the CLI is invoked with -h.
-        */
+    /**
+     * Generate and return the help string, that is, what should be printed to stdout when
+     * the CLI is invoked with -h.
+     */
+    buildHelpString(): string {
         let buffer = new StringBuffer();
 
-        buffer.println("Usage: nex [options] file");
-        buffer.println();
+        buffer.writeln("Usage: nex [...options] [file]");
+        buffer.writeln();
+
+        return buffer.read();
     }
 }
 
@@ -38,7 +40,7 @@ export class NexCLI {
         this.argParser = new ArgParser();
     }
 
-    run() {
+    run(): void {
         // init argparser
         this.argParser.addArgument({
             name: "help",
@@ -56,5 +58,7 @@ export class NexCLI {
         });
 
         let argv = process.argv;
+
+        
     }
 }
