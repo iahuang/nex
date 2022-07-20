@@ -1,3 +1,5 @@
+import { Parser } from "./parser/parser";
+import { SourceReference } from "./source";
 import { StringBuffer } from "./util";
 
 export interface Argument {
@@ -58,7 +60,8 @@ export class NexCLI {
         });
 
         let argv = process.argv;
+        let parser = new Parser(SourceReference.fromPath(argv[2]));
 
-        
+        let document = parser.parse();
     }
 }

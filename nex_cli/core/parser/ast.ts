@@ -2,6 +2,16 @@ export abstract class Element {
 
 }
 
+export abstract class ContainerElement extends Element {
+    children: Element[];
+
+    constructor() {
+        super();
+
+        this.children = [];
+    }
+}
+
 export class Header extends Element {
     depth: number;
     name: string;
@@ -14,28 +24,43 @@ export class Header extends Element {
     }
 }
 
-export class Document {
+export class Document extends ContainerElement {
     /**
      * Specified by the `:title` option
      */
     title: string | null;
-    elements: Element[];
 
     constructor() {
+        super()
         this.title = null;
-        this.elements = [];
     }
 }
 
-export class Callout {
+export class Callout extends ContainerElement {
     /**
      * Specified by the `:title` option
      */
     title: string | null;
-    elements: Element[];
 
     constructor() {
+        super();
         this.title = null;
-        this.elements = [];
+    }
+}
+
+export class Paragraph extends ContainerElement {
+
+}
+
+/**
+ * Valid only as a child element of `Paragraph`.
+ */
+export class Text extends Element {
+    content: string;
+
+    constructor() {
+        super();
+
+        this.content = "";
     }
 }

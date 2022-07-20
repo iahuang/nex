@@ -2,13 +2,18 @@ import { SourceLocation, SourceReference } from "./source";
 import { Token, TokenType } from "./token";
 import { sum } from "./util";
 
+export interface LexingModeOptions {
+    allowWhitespace: boolean;
+    allowNewlines?: boolean;
+}
+
 export class LexingMode {
     validTokenTypes: TokenType[];
-    skipWhitespace: boolean;
+    options: LexingModeOptions;
 
-    constructor(validTokenTypes: TokenType[], skipWhitespace: boolean) {
+    constructor(validTokenTypes: TokenType[], options: LexingModeOptions) {
         this.validTokenTypes = validTokenTypes;
-        this.skipWhitespace = skipWhitespace;
+        this.options = options;
     }
 }
 
@@ -117,7 +122,7 @@ class TokenMatcher {
             throw new Error(`Token type ${TokenType[tokenType]} already has a pattern`);
         }
 
-        if (sum([opts.matcher, opts.regex, opts.string].map((n) => (n ? 1 : 0)))) {
+        if (sum([opts.matcher, opts.regex, opts.string].map((n) => (n ? 1 : 0))) !== 1) {
             throw new Error(
                 "Token pattern must have exactly one of a regex pattern OR a matching function"
             );
@@ -166,7 +171,7 @@ class TokenMatcher {
         for (let tokenType of tokenTypes) {
             let matchedTokenString = this.getPattern(tokenType).match(remainingContent);
 
-            if (matchedTokenString) {
+            if (matchedTokenString !== null) {
                 return { tokenContent: matchedTokenString, type: tokenType };
             }
         }
@@ -179,22 +184,23 @@ class TokenMatcher {
 
         return (
             pattern
-                .addTokenPattern(TokenType.DiagramBlock, { regex: /^#diagram\b/g })
-                .addTokenPattern(TokenType.BlockDeclaration, {regex: /^#(?=\w)/g})
-                .addTokenPattern(TokenType.BlockName, {regex: /^\w+/g})
-                .addTokenPattern(TokenType.Setting, { regex: /^:(?=\w)\b/g })
-                .addTokenPattern(TokenType.SettingName, { regex: /^\w+(?= )\b/g })
+                .addTokenPattern(TokenType.BlockDeclaration, { regex: /^#(?=\w)/g })
+                .addTokenPattern(TokenType.BlockName, { regex: /^\w+/g })
+                .addTokenPattern(TokenType.SettingDeclaration, { regex: /^:(?=\w)\b/g })
+                .addTokenPattern(TokenType.SettingName, { regex: /^\w+/g })
                 // Matches the remaining string to the end of the line
-                .addTokenPattern(TokenType.SettingExpression, { regex: /^.+$/gm })
+                .addTokenPattern(TokenType.SettingExpression, { regex: /^(.+)?$/gm })
                 .addTokenPattern(TokenType.H1, { string: "# " })
                 .addTokenPattern(TokenType.H2, { string: "## " })
                 .addTokenPattern(TokenType.H3, { string: "### " })
                 .addTokenPattern(TokenType.H4, { string: "#### " })
-                .addTokenPattern(TokenType.TextLiteral, { regex: /^./g })
+                .addTokenPattern(TokenType.TextCharacter, { regex: /^./g })
                 .addTokenPattern(TokenType.ItalicBegin, { regex: /^\*(?! |\n)/g })
                 .addTokenPattern(TokenType.ItalicEnd, { regex: /^\*(?! |\n)/g })
-                .addTokenPattern(TokenType.InlineMathModeBegin, { regex: /^\$/g })
-                .addTokenPattern(TokenType.InlineMathModeEnd, { regex: /^\$/g })
+                .addTokenPattern(TokenType.BlockMathModeBegin, { string: "$$" })
+                .addTokenPattern(TokenType.BlockMathModeEnd, { string: "$$" })
+                .addTokenPattern(TokenType.InlineMathModeBegin, { string: "$" })
+                .addTokenPattern(TokenType.InlineMathModeEnd, { string: "$" })
                 .addTokenPattern(TokenType.EOL, { regex: /^\n/g })
                 .addTokenPattern(TokenType.EOF, {
                     matcher: (content) => (content.length === 0 ? "" : null),
@@ -207,6 +213,7 @@ class TokenMatcher {
                 .addTokenPattern(TokenType.EmbeddedText, { regex: /^./g })
                 .addTokenPattern(TokenType.ShorthandInlineMath, { regex: /^!\w+/g })
                 .addTokenPattern(TokenType.Comment, { string: "//" })
+                .addTokenPattern(TokenType.Whitespace, { string: " " })
         );
     }
 }
@@ -244,7 +251,7 @@ export class TokenStream {
 
         this._currentLocation = {
             line: 1,
-            col: 0,
+            col: 1,
         };
     }
 
@@ -277,7 +284,7 @@ export class TokenStream {
 
         if (tokenType === TokenType.EOL || content.includes("\n")) {
             this._currentLocation.line += 1;
-            this._currentLocation.col = 0;
+            this._currentLocation.col = 1;
         } else {
             this._currentLocation.col += content.length;
         }
@@ -298,31 +305,51 @@ export class TokenStream {
     /**
      * In certain lexing contexts, whitespace should be ignored.
      *
-     * If `remainingContent` is prefixed by whitespace (not including newline characters), consume it.
+     * If `remainingContent` is prefixed by whitespace (optionally including newline characters), consume it.
      */
-    private _consumeWhitespace(): void {
-        let match = this.getRemainingContent().match(/^[ \t]+/g);
+    consumeWhitespace(consumeNewlines: boolean): void {
+        while (this.getRemainingContent().length) {
+            let nextCharacter = this.getRemainingContent()[0];
 
-        if (match) {
-            let whitespace = match[0];
-
-            this._currentLocation.col += whitespace.length;
-            this._cursor = whitespace.length;
+            if (nextCharacter === " ") {
+                this._currentLocation.col += 1;
+                this._cursor += 1;
+            } else if (nextCharacter === "\n" && consumeNewlines) {
+                this._currentLocation.col = 1;
+                this._currentLocation.line += 1;
+                this._cursor += 1;
+            } else {
+                break;
+            }
         }
     }
 
     nextToken(mode: LexingMode): Token | null {
-        if (mode.skipWhitespace) {
-            this._consumeWhitespace();
-        }
-
+        // Attempt to match token before removing whitespace
         let match = this.tokenMatcher.matchToken(this.getRemainingContent(), mode.validTokenTypes);
+        let savedPositon = this.getCurrentSourceLocation();
+        let savedCursor = this._cursor;
 
-        if (!match) {
-            return null;
+        if (match) {
+            return this._consumeToken(match.type, match.tokenContent);
         }
 
-        return this._consumeToken(match.type, match.tokenContent);
+        // Otherwise remove whitespace and try again
+        if (mode.options.allowWhitespace) {
+            this.consumeWhitespace(Boolean(mode.options.allowNewlines));
+        }
+
+        match = this.tokenMatcher.matchToken(this.getRemainingContent(), mode.validTokenTypes);
+
+        if (match) {
+            return this._consumeToken(match.type, match.tokenContent);
+        }
+
+        this._cursor = savedCursor;
+        this._currentLocation.col = savedPositon.col;
+        this._currentLocation.line = savedPositon.line;
+
+        return null;
     }
 
     /**

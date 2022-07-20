@@ -1,9 +1,6 @@
 import { SourceReference, SourceLocation } from "./source";
 
 export enum TokenType {
-    // #diagram
-    DiagramBlock,
-
     // a "#" followed by a letter (not included)
     BlockDeclaration,
 
@@ -11,9 +8,9 @@ export enum TokenType {
     BlockName,
 
     // :
-    Setting,
+    SettingDeclaration,
 
-    // <name>
+    // The name of a setting following a ":"
     SettingName,
 
     // Content following an setting ":setting"
@@ -32,7 +29,7 @@ export enum TokenType {
     H4,
 
     // Any non-semantic text.
-    TextLiteral,
+    TextCharacter,
 
     // *
     ItalicBegin,
@@ -79,8 +76,11 @@ export enum TokenType {
     // !<content>
     ShorthandInlineMath,
 
-    // //
+    // "//"
     Comment,
+
+    // A space character. Only used in specific scenarios.
+    Whitespace,
 }
 
 export class Token {

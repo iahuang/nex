@@ -13,6 +13,11 @@
     }
 }
 
+```python
+class Node:
+    pass # implementation goes here
+```
+
 ### Example
 
 #diagram {
