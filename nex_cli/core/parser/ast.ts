@@ -1,6 +1,4 @@
-export abstract class Element {
-
-}
+export abstract class Element {}
 
 export abstract class ContainerElement extends Element {
     children: Element[];
@@ -31,7 +29,7 @@ export class Document extends ContainerElement {
     title: string | null;
 
     constructor() {
-        super()
+        super();
         this.title = null;
     }
 }
@@ -48,9 +46,7 @@ export class Callout extends ContainerElement {
     }
 }
 
-export class Paragraph extends ContainerElement {
-
-}
+export class Paragraph extends ContainerElement {}
 
 /**
  * Valid only as a child element of `Paragraph`.
@@ -63,4 +59,40 @@ export class Text extends Element {
 
         this.content = "";
     }
+}
+
+/**
+ * Return `text` with all lines indented by `indent * 4` spaces.
+ */
+function _indent(text: string, indent: number): string {
+    return text
+        .split("\n")
+        .map((line) => " ".repeat(indent * 4) + line)
+        .join("\n");
+}
+
+/**
+ * Export a JSON-like representation of an AST element and its children
+ */
+export function dump(root: Element): string {
+    return _dump(root);
+}
+
+function _dump(element: Element): string {
+    if (element instanceof Text) {
+        return `Text { ${JSON.stringify(element.content)} }`;
+    }
+
+    if (element instanceof ContainerElement) {
+        let out: string[] = [`${element.constructor.name} [`];
+
+        for (let child of element.children) {
+            out.push(_indent(_dump(child), 1) + ",");
+        }
+
+        out.push("]");
+
+        return out.join("\n");
+    }
+    return `${element.constructor.name} ${JSON.stringify(element)}`;
 }

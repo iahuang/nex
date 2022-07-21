@@ -1,3 +1,4 @@
+import { dump } from "./parser/ast";
 import { Parser } from "./parser/parser";
 import { SourceReference } from "./source";
 import { StringBuffer } from "./util";
@@ -63,5 +64,6 @@ export class NexCLI {
         let parser = new Parser(SourceReference.fromPath(argv[2]));
 
         let document = parser.parse();
+        console.log(dump(document));
     }
 }

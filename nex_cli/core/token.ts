@@ -70,9 +70,6 @@ export enum TokenType {
     // ```
     CodeEnd,
 
-    // stuff inside #script blocks and the like
-    EmbeddedText,
-
     // !<content>
     ShorthandInlineMath,
 

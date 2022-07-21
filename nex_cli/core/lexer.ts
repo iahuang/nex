@@ -3,7 +3,7 @@ import { Token, TokenType } from "./token";
 import { sum } from "./util";
 
 export interface LexingModeOptions {
-    allowWhitespace: boolean;
+    skipWhitespace: boolean;
     allowNewlines?: boolean;
 }
 
@@ -210,7 +210,6 @@ class TokenMatcher {
                 .addTokenPattern(TokenType.CodeBegin, { regex: /^```/g })
                 .addTokenPattern(TokenType.LangCodeBegin, { regex: /^```\w+/g })
                 .addTokenPattern(TokenType.CodeEnd, { string: "```" })
-                .addTokenPattern(TokenType.EmbeddedText, { regex: /^./g })
                 .addTokenPattern(TokenType.ShorthandInlineMath, { regex: /^!\w+/g })
                 .addTokenPattern(TokenType.Comment, { string: "//" })
                 .addTokenPattern(TokenType.Whitespace, { string: " " })
@@ -274,7 +273,7 @@ export class TokenStream {
      * Given a matched token type and token content, return a token instance
      * and update current source location.
      */
-    private _consumeToken(tokenType: TokenType, content: string): Token {
+    private _buildToken(tokenType: TokenType, content: string, peek: boolean): Token {
         let token = new Token(
             this.source,
             tokenType,
@@ -282,16 +281,57 @@ export class TokenStream {
             content
         );
 
-        if (tokenType === TokenType.EOL || content.includes("\n")) {
-            this._currentLocation.line += 1;
-            this._currentLocation.col = 1;
-        } else {
-            this._currentLocation.col += content.length;
+        if (!peek) {
+            this.consumeToken(token);
         }
 
-        this._cursor += content.length;
-
         return token;
+    }
+
+    /**
+     * Consider that on encountering a `TextCharacter` token, we should begin a paragraph.
+     * However, the `TextCharacter` token we just consumed should also be part of that
+     * paragraph. This method will reverse the consumption process for the passed token,
+     * essentially moving the stream location to before the token.
+     */
+    unconsumeToken(token: Token): void {
+        let reverseTokenContent = token.content.split("").reverse();
+
+        for (let c of reverseTokenContent) {
+            if (c === "\n") {
+                this._currentLocation.col = 1;
+                this._currentLocation.line -= 1;
+            } else {
+                this._currentLocation.col -= 1;
+            }
+
+            this._cursor -= 1;
+        }
+    }
+
+    /**
+     * Move the stream location ahead by the length of the token.
+     *
+     * Update stream location `line` and `col` respectively.
+     */
+    consumeToken(token: Token): void {
+        if (token.type === TokenType.EOL) {
+            this._currentLocation.line += 1;
+            this._currentLocation.col = 1;
+        } else if (token.content.includes("\n")) {
+            for (let char of token.content) {
+                this._currentLocation.col += 1;
+
+                if (char === "\n") {
+                    this._currentLocation.col = 1;
+                    this._currentLocation.line += 1;
+                }
+            }
+        } else {
+            this._currentLocation.col += token.content.length;
+        }
+
+        this._cursor += token.content.length;
     }
 
     getCurrentSourceLocation(): SourceLocation {
@@ -324,25 +364,33 @@ export class TokenStream {
         }
     }
 
-    nextToken(mode: LexingMode): Token | null {
+    /**
+     * Return the next token in the token stream using the specified lexing mode.
+     *
+     * If no token was successfully matched, the stream location will not change, and
+     * this method will return `null`.
+     *
+     * If `opts.peek` is `true`, then the stream location will not change.
+     */
+    nextToken(mode: LexingMode, opts: { peek?: boolean } = {}): Token | null {
         // Attempt to match token before removing whitespace
         let match = this.tokenMatcher.matchToken(this.getRemainingContent(), mode.validTokenTypes);
         let savedPositon = this.getCurrentSourceLocation();
         let savedCursor = this._cursor;
+        let peek = opts.peek ?? false;
 
         if (match) {
-            return this._consumeToken(match.type, match.tokenContent);
+            return this._buildToken(match.type, match.tokenContent, peek);
         }
 
         // Otherwise remove whitespace and try again
-        if (mode.options.allowWhitespace) {
+        if (mode.options.skipWhitespace) {
             this.consumeWhitespace(Boolean(mode.options.allowNewlines));
-        }
 
-        match = this.tokenMatcher.matchToken(this.getRemainingContent(), mode.validTokenTypes);
-
-        if (match) {
-            return this._consumeToken(match.type, match.tokenContent);
+            match = this.tokenMatcher.matchToken(this.getRemainingContent(), mode.validTokenTypes);
+            if (match) {
+                return this._buildToken(match.type, match.tokenContent, peek);
+            }
         }
 
         this._cursor = savedCursor;
@@ -376,6 +424,10 @@ export class TokenStream {
 
         if (expectedCharacter) {
             message += `; expected "${expectedCharacter}"`;
+        }
+
+        if (offendingCharacter === "[EOF]") {
+            message += " (missing closing bracket?)";
         }
 
         return message;
