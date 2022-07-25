@@ -11,14 +11,21 @@ export abstract class ContainerElement extends Element {
 }
 
 export class Header extends Element {
+    /**
+     * H1: `depth=1`
+     * 
+     * H2: `depth=2`
+     * 
+     * etc.
+     */
     depth: number;
-    name: string;
+    content: Paragraph;
 
-    constructor(depth: number, headerName: string) {
+    constructor(depth: number, content: Paragraph) {
         super();
 
         this.depth = depth;
-        this.name = headerName;
+        this.content = content;
     }
 }
 
@@ -46,18 +53,53 @@ export class Callout extends ContainerElement {
     }
 }
 
+
+export class CodeBlock extends Element {
+    content: string;
+    language: string | null;
+
+    constructor(content: string, language: string | null = null) {
+        super();
+        this.content = content;
+        this.language = language;
+    }
+}
+
+
+export class BlockMath extends Element {
+    content: string;
+
+    constructor(content: string) {
+        super();
+        this.content = content;
+    }
+}
+
 export class Paragraph extends ContainerElement {}
 
 /**
- * Valid only as a child element of `Paragraph`.
+ * Valid only as a child element of `Paragraph`. Represent some inline text semantic element
+ * such as italics or inline math.
  */
-export class Text extends Element {
+export abstract class Textual extends Element {
     content: string;
 
-    constructor() {
+    constructor(content: string) {
         super();
 
-        this.content = "";
+        this.content = content;
+    }
+}
+
+export class Text extends Textual {
+    constructor(content: string) {
+        super(content);
+    }
+}
+
+export class InlineMath extends Textual {
+    constructor(content: string) {
+        super(content);
     }
 }
 

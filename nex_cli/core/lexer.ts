@@ -213,6 +213,13 @@ class TokenMatcher {
                 .addTokenPattern(TokenType.ShorthandInlineMath, { regex: /^!\w+/g })
                 .addTokenPattern(TokenType.Comment, { string: "//" })
                 .addTokenPattern(TokenType.Whitespace, { string: " " })
+                .addTokenPattern(TokenType.LatexTextStart, { string: "\\text{" })
+                .addTokenPattern(TokenType.LatexEscapedBackslash, { string: "\\\\" })
+                .addTokenPattern(TokenType.LatexEscapedCurly, { regex: /^(\\{)|(\\})/g })
+                .addTokenPattern(TokenType.LatexEscapedDollarSign, { string: "\\$" })
+                .addTokenPattern(TokenType.LatexCurlyStart, { string: "{" })
+                .addTokenPattern(TokenType.LatexCurlyEnd, { string: "}" })
+                .addTokenPattern(TokenType.LatexCharacter, { regex: /^./g })
         );
     }
 }

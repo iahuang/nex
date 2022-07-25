@@ -1,7 +1,17 @@
 import { LexingMode, LexingModeOptions, TokenStream } from "../lexer";
 import { SourceLocation, SourceReference } from "../source";
 import { Token, TokenType } from "../token";
-import { Callout, ContainerElement, Document, Paragraph, Text } from "./ast";
+import {
+    BlockMath,
+    Callout,
+    CodeBlock,
+    ContainerElement,
+    Document,
+    Header,
+    InlineMath,
+    Paragraph,
+    Text,
+} from "./ast";
 
 // lexing modes
 const MODE_TOPLEVEL = new LexingMode(
@@ -53,17 +63,55 @@ const MODE_INLINE = new LexingMode(
         TokenType.ShorthandInlineMath,
         TokenType.TextCharacter,
         TokenType.EOL,
+        TokenType.EOF,
     ],
     {
         skipWhitespace: false,
     }
 );
 
-export class SyntaxError {
+const MODE_INLINE_MATH = new LexingMode(
+    [
+        TokenType.LatexTextStart,
+        TokenType.LatexCurlyStart,
+        TokenType.LatexEscapedBackslash,
+        TokenType.LatexEscapedCurly,
+        TokenType.LatexEscapedDollarSign,
+        TokenType.LatexCurlyEnd,
+        TokenType.InlineMathModeEnd,
+        TokenType.LatexCharacter,
+    ],
+    {
+        skipWhitespace: false,
+    }
+);
+
+const MODE_BLOCK_MATH = new LexingMode(
+    [
+        TokenType.LatexEscapedBackslash,
+        TokenType.LatexEscapedDollarSign,
+        TokenType.BlockMathModeEnd,
+        TokenType.EOL,
+        TokenType.LatexCharacter,
+    ],
+    {
+        skipWhitespace: false,
+    }
+);
+
+const MODE_CODE_BLOCK = new LexingMode(
+    [TokenType.CodeEnd, TokenType.EOL, TokenType.TextCharacter],
+    {
+        skipWhitespace: false,
+    }
+);
+
+export class SyntaxError extends Error {
     location: SourceLocation;
     message: string;
 
     constructor(location: SourceLocation, message: string) {
+        super(message);
         this.location = location;
         this.message = message;
     }
@@ -171,10 +219,9 @@ export class Parser {
     ): void {
         let paragraph = new Paragraph();
         this.tokenStream.unconsumeToken(startingToken);
+        this.tokenStream.consumeWhitespace(false);
 
         while (true) {
-            this.tokenStream.consumeWhitespace(false);
-
             // Peek the next token
             let token = this.tokenStream.nextToken(MODE_INLINE, { peek: true });
 
@@ -187,6 +234,10 @@ export class Parser {
             switch (token.type) {
                 case TokenType.TextCharacter:
                     this._parseText(paragraph);
+                    break;
+                case TokenType.InlineMathModeBegin:
+                    this.tokenStream.consumeToken(token);
+                    this._parseInlineMath(paragraph);
                     break;
                 case TokenType.EOL:
                     // consume the token we peeked so we can peek the token after that
@@ -224,11 +275,215 @@ export class Parser {
                             parent.children.push(paragraph);
                             return;
                         }
+
+                        // otherwise, trim leading whitespace and keep parsing the paragraph
+                        this.tokenStream.consumeWhitespace(false);
                     }
                     break;
+                case TokenType.EOF:
+                    parent.children.push(paragraph);
+                    return;
                 default:
-                    // 
-                    throw new SyntaxError(this.getCurrentSourceLocation(), `Unrecognized token ${token.content}`);
+                    this._debug_unhandledTokenError(token);
+            }
+        }
+    }
+
+    private _parseInlineMath(parent: Paragraph): void {
+        let latex = "";
+
+        enum Environment {
+            Text,
+            Curly,
+            Math,
+        }
+
+        // Parsing inline math is not so simple because nested dollar signs are allowed
+        // inside of \text{} blocks.
+
+        // Create a stack; when we enter text mode via \text{}, add Environment.Text
+        // to the stack. When we leave text mode via }, pop the last item off the stack,
+        // ensuring that it is Environment.Text or Environment.Curly.
+        //
+        // Similarly, when we encounter a "$" character, if the last item on the stack
+        // is an Environment.Math, pop that item off. If there are no items on the stack,
+        // return, and otherwise, throw an error.
+        //
+        // Finally, if we encounter a non-"\text{" "{" character, push Environment.Curly to the
+        // stack.
+        let stack: Environment[] = [];
+
+        while (true) {
+            let token = this.tokenStream.nextToken(MODE_INLINE_MATH);
+
+            if (!token) {
+                this._unexpectedTokenError();
+            }
+
+            switch (token.type) {
+                case TokenType.LatexTextStart:
+                    latex += token.content;
+                    stack.push(Environment.Text);
+                    break;
+                case TokenType.LatexCurlyStart:
+                    latex += token.content;
+                    stack.push(Environment.Curly);
+                    break;    
+                case TokenType.LatexCurlyEnd:
+                    latex += token.content;
+
+                    {
+                        let popped = stack.pop();
+
+                        if (popped === undefined) {
+                            throw new SyntaxError(
+                                this.getCurrentSourceLocation(),
+                                `Unexpected "}"`
+                            );
+                        } else if (popped === Environment.Math) {
+                            throw new SyntaxError(
+                                this.getCurrentSourceLocation(),
+                                `Unexpected "}"`
+                            );
+                        } else {
+                            // ok
+                        }
+                    }
+
+                    break;
+                case TokenType.InlineMathModeEnd:
+                    // this case matches a dollar sign token ("$"). this only signifies the end
+                    // of the inline math element if the stack is empty. otherwise, this
+                    // token may only be terminating an inline math statement.
+                    //
+                    // In the context of a \text{} environment, this token denotes
+                    // the *start* of a math environment.
+
+                    {
+                        let currentEnvironment = stack[stack.length - 1];
+
+                        if (currentEnvironment === undefined) {
+                            let mathElement = new InlineMath(latex);
+                            parent.children.push(mathElement);
+                            return;
+                        } else if (currentEnvironment === Environment.Text) {
+                            latex += token.content;
+                            stack.push(Environment.Math);
+                        } else if (currentEnvironment === Environment.Math) {
+                            latex += token.content;
+                            stack.pop();
+                        }
+                    }
+                    break;
+                case TokenType.LatexEscapedBackslash:
+                    latex += token.content;
+                    break;
+                case TokenType.LatexEscapedDollarSign:
+                    latex += token.content;
+                    break;
+                case TokenType.LatexEscapedCurly:
+                    latex += token.content;
+                    break;
+                case TokenType.LatexCharacter:
+                    latex += token.content;
+                    break;
+                default:
+                    this._debug_unhandledTokenError(token);
+            }
+        }
+    }
+
+    private _parseBlockMath(parent: ContainerElement): void {
+        let latex = "";
+
+        while (true) {
+            let token = this.tokenStream.nextToken(MODE_BLOCK_MATH);
+
+            if (!token) {
+                this._unexpectedTokenError();
+            }
+
+            switch (token.type) {
+                case TokenType.LatexEscapedBackslash:
+                    latex += token.content;
+                    break;
+                case TokenType.LatexEscapedDollarSign:
+                    latex += token.content;
+                    break;
+                case TokenType.LatexCharacter:
+                    latex += token.content;
+                    break;
+                case TokenType.EOL:
+                    latex += token.content;
+                    this.tokenStream.consumeWhitespace(false);
+                    break;
+                case TokenType.BlockMathModeEnd: {
+                    let mathElement = new BlockMath(latex);
+                    parent.children.push(mathElement);
+                    return;
+                }
+                default:
+                    this._debug_unhandledTokenError(token);
+            }
+        }
+    }
+
+    private _parseCodeBlock(parent: Paragraph, language: string | null): void {
+        let code = "";
+
+        while (true) {
+            let token = this.tokenStream.nextToken(MODE_CODE_BLOCK);
+
+            if (!token) {
+                this._unexpectedTokenError();
+            }
+
+            switch (token.type) {
+                case TokenType.TextCharacter:
+                    code += token.content;
+                    break;
+                case TokenType.EOL:
+                    code += token.content;
+                    break;
+                case TokenType.CodeEnd: {
+                    let codeElement = new CodeBlock(code, language);
+                    parent.children.push(codeElement);
+                    return;
+                }
+                default:
+                    this._debug_unhandledTokenError(token);
+            }
+        }
+    }
+
+    private _parseHeader(parent: ContainerElement, depth: number): void {
+        let content = new Paragraph();
+        this.tokenStream.consumeWhitespace(false);
+
+        while (true) {
+            // Peek the next token
+            let token = this.tokenStream.nextToken(MODE_INLINE, { peek: true });
+
+            if (!token) {
+                this._unexpectedTokenError();
+            }
+
+            switch (token.type) {
+                case TokenType.TextCharacter:
+                    this._parseText(content);
+                    break;
+                case TokenType.InlineMathModeBegin:
+                    this.tokenStream.consumeToken(token);
+                    this._parseInlineMath(content);
+                    break;
+                case TokenType.EOF:
+                    parent.children.push(new Header(depth, content));
+                    return;
+                case TokenType.EOL:
+                    parent.children.push(new Header(depth, content));
+                    return;
+                default:
+                    this._debug_unhandledTokenError(token);
             }
         }
     }
@@ -243,7 +498,7 @@ export class Parser {
             //  - a token denoting the start of some inline formatting element such as inline math,
             //    italics, etc.
             //  - EOL
-            // 
+            //
             // we peek this token so we can decide whether to consume it later.
             let token = this.tokenStream.nextToken(MODE_INLINE, { peek: true });
 
@@ -263,8 +518,7 @@ export class Parser {
                 // consuming the token we just found (we leave it to the parent environment)
                 // to deal with.
 
-                let textElement = new Text();
-                textElement.content = text;
+                let textElement = new Text(text);
 
                 parent.children.push(textElement);
 
@@ -279,12 +533,9 @@ export class Parser {
      * If the provided token is of type `SettingDeclaration`, then parse
      * the following setting expression and return it; otherwise, return `null`.
      *
-     * The passed token should be *peeked*. This method will consume it if necessary.
      */
     private _handleSetting(token: Token): { name: string; settingValue: string } | null {
         if (token.type === TokenType.SettingDeclaration) {
-            this.tokenStream.consumeToken(token);
-
             let settingName = this._expectToken(TokenType.SettingName, {
                 skipWhitespace: false,
             });
@@ -320,8 +571,29 @@ export class Parser {
             case TokenType.BlockDeclaration:
                 this._parseBlock(container);
                 break;
+            case TokenType.BlockMathModeBegin:
+                this._parseBlockMath(container);
+                break;
+            case TokenType.CodeBegin:
+                this._parseCodeBlock(container, null);
+                break;
+            case TokenType.LangCodeBegin:
+                this._parseCodeBlock(container, token.content.substring(3));
+                break;
             case TokenType.TextCharacter:
                 this._parseParagraph(container, parentMode, token);
+                break;
+            case TokenType.H1:
+                this._parseHeader(container, 1);
+                break;
+            case TokenType.H2:
+                this._parseHeader(container, 2);
+                break;
+            case TokenType.H3:
+                this._parseHeader(container, 3);
+                break;
+            case TokenType.H4:
+                this._parseHeader(container, 4);
                 break;
         }
     }
@@ -335,6 +607,8 @@ export class Parser {
             if (!token) {
                 this._unexpectedTokenError();
             }
+
+            console.log(token.tokenTypeName(), JSON.stringify(token.content))
 
             this._handleGenericTopLevelToken(token, document, MODE_TOPLEVEL);
 
@@ -398,6 +672,20 @@ export class Parser {
         }
 
         return token;
+    }
+
+    /**
+     * To be used by parsing functions under the `default` clause of a switch case
+     * statement that matches the type of the matched token to the appropriate action.
+     *
+     * In practice, the token type matching switch statements should be exhaustive, and
+     * this error should never occur in production.
+     */
+    private _debug_unhandledTokenError(token: Token): never {
+        throw new SyntaxError(
+            this.getCurrentSourceLocation(),
+            `Unhandled token "${token.content}" with type ${token.tokenTypeName()}`
+        );
     }
 
     /**

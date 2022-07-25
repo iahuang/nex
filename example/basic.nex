@@ -1,11 +1,16 @@
 :title Introduction to Graphs
+:latexdef pair 1 \{#1\}
 
-bruh bruh bruh bruh
-eeek $bruh$
+## Definitions
 
+#callout {
+    :title Definition (Graph)
 
-#callout { 
-    breh
+    A graph is a pair of sets $(V,E)$ which are defined as follows:
 
-    bruh
 }
+
+```python
+class Node:
+    pass # implementation goes here
+```

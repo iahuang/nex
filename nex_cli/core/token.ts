@@ -78,6 +78,18 @@ export enum TokenType {
 
     // A space character. Only used in specific scenarios.
     Whitespace,
+
+    LatexTextStart,
+
+    LatexCurlyStart,
+
+    LatexEscapedCurly,
+
+    LatexEscapedDollarSign,
+
+    LatexCurlyEnd,
+
+    LatexCharacter,
 }
 
 export class Token {
