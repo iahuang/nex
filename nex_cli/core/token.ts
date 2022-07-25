@@ -87,6 +87,8 @@ export enum TokenType {
 
     LatexEscapedDollarSign,
 
+    LatexEscapedBackslash,
+
     LatexCurlyEnd,
 
     LatexCharacter,
