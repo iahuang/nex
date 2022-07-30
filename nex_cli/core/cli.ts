@@ -1,3 +1,4 @@
+import { HTMLGenerator } from "./generation/generator";
 import { dump } from "./parser/ast";
 import { Parser } from "./parser/parser";
 import { SourceReference } from "./source";
@@ -9,6 +10,33 @@ export interface Argument {
     description: string | null;
     requiresValue: boolean;
     default: string | null; // if a default is specified (i.e Arguemnt.default !== null, then the argument becomes optional.)
+}
+
+export interface ArgumentSetting {
+    argumentName: string;
+    value: string | null;
+}
+
+export class Settings {
+    argumentSettings: ArgumentSetting[];
+    inputFile: string | null;
+
+    constructor(settings: ArgumentSetting[]) {
+        this.argumentSettings = settings;
+        this.inputFile = null;
+    }
+
+    hasArgument(argName: string): boolean {
+        return this.getArgumentSetting(argName) !== null;
+    }
+
+    getArgumentSetting(argName: string): ArgumentSetting | null {
+        return this.getArgumentSettings(argName)[0] ?? null;
+    }
+
+    getArgumentSettings(argName: string): ArgumentSetting[] {
+        return this.argumentSettings.filter(setting => setting.argumentName === argName);
+    }
 }
 
 export class ArgParser {
@@ -29,10 +57,23 @@ export class ArgParser {
     buildHelpString(): string {
         let buffer = new StringBuffer();
 
-        buffer.writeln("Usage: nex [...options] [file]");
+        buffer.writeln("Usage: nex [...options] [input file or directory]");
         buffer.writeln();
 
         return buffer.read();
+    }
+
+    /**
+     * Return an object containing each passed argument and their corresponding
+     * specified value (if applicable), in the order in which they were passed.
+     * 
+     * Arguments with specified default values will be included at the start
+     * of this array.
+     * 
+     * The passed value for `argv` *should*
+     */
+    parse(argv: string[]): Settings {
+        
     }
 }
 
@@ -52,6 +93,7 @@ export class NexCLI {
             requiresValue: false,
             default: null,
         });
+
         this.argParser.addArgument({
             name: "version",
             shortcut: null,
@@ -60,10 +102,28 @@ export class NexCLI {
             default: null,
         });
 
+        this.argParser.addArgument({
+            name: "build",
+            shortcut: null,
+            description: "Build the specified nex file to a standalone HTML file",
+            requiresValue: false,
+            default: null,
+        });
+
+        this.argParser.addArgument({
+            name: "out",
+            shortcut: null,
+            description: "Build the specified file",
+            requiresValue: true,
+            default: null,
+        });
+
         let argv = process.argv;
         let parser = new Parser(SourceReference.fromPath(argv[2]));
 
         let document = parser.parse();
-        console.log(dump(document));
+
+        let generator = new HTMLGenerator();
+        console.log(generator.generateContentsAsHTML(document).asHTML());
     }
 }

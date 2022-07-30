@@ -25,7 +25,6 @@ const MODE_TOPLEVEL = new LexingMode(
         TokenType.BlockMathModeBegin,
         TokenType.LangCodeBegin,
         TokenType.CodeBegin,
-        TokenType.InlineMathModeBegin,
         TokenType.EOF,
         TokenType.EOL,
         TokenType.TextCharacter,
@@ -46,7 +45,6 @@ const MODE_TOPLEVELCALLOUT = new LexingMode(
         TokenType.BlockMathModeBegin,
         TokenType.LangCodeBegin,
         TokenType.CodeBegin,
-        TokenType.InlineMathModeBegin,
         TokenType.BlockEnd,
         TokenType.EOL,
         TokenType.TextCharacter,
@@ -194,10 +192,24 @@ export class Parser {
         let callout = new Callout();
 
         while (true) {
+            this.tokenStream.consumeWhitespace(false);
             let token = this.tokenStream.nextToken(MODE_TOPLEVELCALLOUT);
 
             if (!token) {
                 this._unexpectedTokenError();
+            }
+
+            let setting = this._handleSetting(token);
+
+            if (setting) {
+                switch (setting.name) {
+                    case "title":
+                        callout.title = setting.settingValue;
+                        break;
+                    default:
+                        this.addWarning(`Unknown setting name "${setting.name}"`);
+                        break;
+                }
             }
 
             this._handleGenericTopLevelToken(token, callout, MODE_TOPLEVELCALLOUT);
@@ -280,6 +292,10 @@ export class Parser {
                         this.tokenStream.consumeWhitespace(false);
                     }
                     break;
+                case TokenType.ShorthandInlineMath:
+                    this.tokenStream.consumeToken(token);
+                    parent.children.push(new InlineMath(token.content.slice(1)));
+                    break;
                 case TokenType.EOF:
                     parent.children.push(paragraph);
                     return;
@@ -328,7 +344,7 @@ export class Parser {
                 case TokenType.LatexCurlyStart:
                     latex += token.content;
                     stack.push(Environment.Curly);
-                    break;    
+                    break;
                 case TokenType.LatexCurlyEnd:
                     latex += token.content;
 
@@ -607,8 +623,6 @@ export class Parser {
             if (!token) {
                 this._unexpectedTokenError();
             }
-
-            console.log(token.tokenTypeName(), JSON.stringify(token.content))
 
             this._handleGenericTopLevelToken(token, document, MODE_TOPLEVEL);
 

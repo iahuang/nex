@@ -215,7 +215,17 @@ class TokenMatcher {
                 .addTokenPattern(TokenType.Whitespace, { string: " " })
                 .addTokenPattern(TokenType.LatexTextStart, { string: "\\text{" })
                 .addTokenPattern(TokenType.LatexEscapedBackslash, { string: "\\\\" })
-                .addTokenPattern(TokenType.LatexEscapedCurly, { regex: /^(\\{)|(\\})/g })
+                .addTokenPattern(TokenType.LatexEscapedCurly, { matcher: (content) => {
+                    if (content.startsWith("\\{")) {
+                        return "\\{";
+                    }
+
+                    if (content.startsWith("\\}")) {
+                        return "\\}";
+                    }
+
+                    return null;
+                } })
                 .addTokenPattern(TokenType.LatexEscapedDollarSign, { string: "\\$" })
                 .addTokenPattern(TokenType.LatexCurlyStart, { string: "{" })
                 .addTokenPattern(TokenType.LatexCurlyEnd, { string: "}" })

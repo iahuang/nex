@@ -1,0 +1,29 @@
+body {
+    margin: 0;
+    padding: 20px;
+    font-family: "Computer Modern", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+@font-face {
+    font-family: "Computer Modern";
+    src: url("cmunrm.ttf");
+}
+@font-face {
+    font-family: "Computer Modern";
+    src: url("cmunbx.otf");
+    font-weight: bold;
+}
+@font-face {
+    font-family: "Computer Modern";
+    src: url("cmunti.ttf");
+    font-style: italic, oblique;
+}
+@font-face {
+    font-family: "Computer Modern";
+    src: url("cmunbi.otf");
+    font-weight: bold;
+    font-style: italic, oblique;
+}

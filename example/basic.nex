@@ -8,6 +8,9 @@
 
     A graph is a pair of sets $(V,E)$ which are defined as follows:
 
+    - !V is a set of objects. Each element $V\{\}$ is called a vertex of the graph, and !V itself is called the set of vertices of the graph.
+
+    - !E is a set of pairs of objects from !V where each pair $\pair{v_1, v_2}$ is a set consisting of two distinct vertices and is called an edge of the graph. Order does not matter, that is, $\{v_1,v_@\}\equiv \{v_2,v_1\}$.
 }
 
 ```python
