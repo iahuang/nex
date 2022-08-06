@@ -1,6 +1,6 @@
 # NeX
 
-NeX is a markup language with lightweight syntax designed for note-taking and drafting documents, especially for fields of studies related to mathematics and computer science.
+NeX is a markup language with lightweight syntax designed for note-taking and drafting documents, especially for fields of study related to mathematics and computer science.
 
 > **NOTE:** This project is in early development stages. Use with caution.
 

@@ -14,7 +14,7 @@
 }
 
 #m {
-    2pi+1
+    log_b a = (ln a)/(ln b)
 }
 
 ```python
