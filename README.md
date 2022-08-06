@@ -13,7 +13,7 @@ To see examples of NeX syntax, see the `examples/` folder.
 ## Installation
 
 You need to have Node.js (v14 or higher) installed to run NeX. 
-1. [Download](https://github.com/iahuang/nex/archive/refs/heads/master.zip) this repository, then `cd` to the downloaded copy of this repository and run `npm run install-nex`.
+1. [Download](https://github.com/iahuang/nex/archive/refs/heads/master.zip) this repository, then `cd` to the downloaded copy of this repository and ~~run `npm run install-nex`.~~ **Currently the installer is not functional**
 2. Run `nex -h` to confirm that the installation succeeded.
 
 ## Introduction to NeX
