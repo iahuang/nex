@@ -1,4 +1,8 @@
-import { LexingMode, LexingModeOptions, TokenStream } from "../lexer";
+/**
+ * NeX main parser.
+ */
+
+import { LexingMode, TokenStream } from "../lexer";
 import { SourceLocation, SourceReference } from "../source";
 import { Token, TokenType } from "../token";
 import {
@@ -12,6 +16,9 @@ import {
     Paragraph,
     Text,
 } from "./ast";
+import { NexSyntaxError } from "./errors";
+import { NexMathParser } from "./nex_math/parser";
+import { ParserBase } from "./parser_base";
 
 // lexing modes
 const MODE_TOPLEVEL = new LexingMode(
@@ -104,17 +111,6 @@ const MODE_CODE_BLOCK = new LexingMode(
     }
 );
 
-export class SyntaxError extends Error {
-    location: SourceLocation;
-    message: string;
-
-    constructor(location: SourceLocation, message: string) {
-        super(message);
-        this.location = location;
-        this.message = message;
-    }
-}
-
 export class Warning {
     location: SourceLocation;
     message: string;
@@ -125,29 +121,19 @@ export class Warning {
     }
 }
 
-export class Parser {
+export class Parser extends ParserBase {
     source: SourceReference;
     tokenStream: TokenStream;
+    nexMathParser: NexMathParser;
     private _warnings: Warning[];
 
     constructor(source: SourceReference) {
+        super();
+
         this.source = source;
         this._warnings = [];
         this.tokenStream = new TokenStream(source);
-    }
-
-    getCurrentSourceLocation(): SourceLocation {
-        return this.tokenStream.getCurrentSourceLocation();
-    }
-
-    /**
-     * Throw an unexpected token error at the current location.
-     */
-    private _unexpectedTokenError(): never {
-        throw new SyntaxError(
-            this.getCurrentSourceLocation(),
-            this.tokenStream.unexpectedTokenError()
-        );
+        this.nexMathParser = new NexMathParser(this.tokenStream);
     }
 
     /**
@@ -176,8 +162,11 @@ export class Parser {
                 break;
             case "diagram":
                 break;
+            case "m":
+                parent.children.push(new BlockMath(this.nexMathParser.parse()));
+                break;
             default:
-                throw new SyntaxError(
+                throw new NexSyntaxError(
                     this.getCurrentSourceLocation(),
                     `Unknown block type "${blockName}"`
                 );
@@ -352,12 +341,12 @@ export class Parser {
                         let popped = stack.pop();
 
                         if (popped === undefined) {
-                            throw new SyntaxError(
+                            throw new NexSyntaxError(
                                 this.getCurrentSourceLocation(),
                                 `Unexpected "}"`
                             );
                         } else if (popped === Environment.Math) {
-                            throw new SyntaxError(
+                            throw new NexSyntaxError(
                                 this.getCurrentSourceLocation(),
                                 `Unexpected "}"`
                             );
@@ -659,50 +648,6 @@ export class Parser {
     }
 
     /**
-     * Expect the following token type and return the corresponding Token object.
-     *
-     * If the token stream is unable to match the specified token type, throw a `SyntaxError`.
-     */
-    private _expectToken(expectedTokenType: TokenType, options: LexingModeOptions): Token {
-        let mode = new LexingMode([expectedTokenType], options);
-        let token = this.tokenStream.nextToken(mode);
-
-        if (!token) {
-            let expectedPattern = this.tokenStream.tokenMatcher.getPattern(expectedTokenType);
-            let expected = expectedPattern.getExpectedTokenContent();
-
-            // If able to provide the expected token content, provide that in the error message.
-            if (expected) {
-                throw new SyntaxError(
-                    this.getCurrentSourceLocation(),
-                    this.tokenStream.unexpectedTokenError(expected)
-                );
-            } else {
-                throw new SyntaxError(
-                    this.getCurrentSourceLocation(),
-                    this.tokenStream.unexpectedTokenError()
-                );
-            }
-        }
-
-        return token;
-    }
-
-    /**
-     * To be used by parsing functions under the `default` clause of a switch case
-     * statement that matches the type of the matched token to the appropriate action.
-     *
-     * In practice, the token type matching switch statements should be exhaustive, and
-     * this error should never occur in production.
-     */
-    private _debug_unhandledTokenError(token: Token): never {
-        throw new SyntaxError(
-            this.getCurrentSourceLocation(),
-            `Unhandled token "${token.content}" with type ${token.tokenTypeName()}`
-        );
-    }
-
-    /**
      * Expect the next token to be an end of line or end of file token. Trailing whitespace is allowed.
      * Throw a `SyntaxError` if this is not the case.
      */
@@ -715,7 +660,7 @@ export class Parser {
             let found = this.tokenStream.getRemainingContent()[0];
             let message = `Expected end of line or end of file, but found "${found}"`;
 
-            throw new SyntaxError(this.getCurrentSourceLocation(), message);
+            throw new NexSyntaxError(this.getCurrentSourceLocation(), message);
         }
     }
 }

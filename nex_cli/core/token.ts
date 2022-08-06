@@ -79,19 +79,63 @@ export enum TokenType {
     // A space character. Only used in specific scenarios.
     Whitespace,
 
+    // "\text{"
     LatexTextStart,
 
+    // "{"
     LatexCurlyStart,
 
+    // "\{" or "\}"
     LatexEscapedCurly,
 
+    // "\$"
     LatexEscapedDollarSign,
 
+    // "\\"
     LatexEscapedBackslash,
 
+    // "}"
     LatexCurlyEnd,
 
+    // TextCharacter, but for LaTeX contexts
     LatexCharacter,
+
+    // "sin", "plusminus", "union", ">=", etc.
+    NMKeyword,
+
+    // "sum", "int", "lim", etc.
+    NMFunction,
+
+    // "^"
+    NMExponent,
+
+    // "_"
+    NMSubscript,
+
+    // "/"
+    NMFrac,
+
+    // "("
+    NMParenLeft,
+
+    // "}"
+    NMParenRight,
+
+    // "["
+    NMBracketLeft,
+
+    // "]"
+    NMBracketRight,
+
+    // "{"
+    NMCurlyLeft,
+
+    // "}"
+    NMCurlyRight,
+
+
+    // TextCharacter, but for NeX math contexts
+    NMCharacter,
 }
 
 export class Token {

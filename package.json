@@ -11,5 +11,8 @@
     "scripts": {
         "install-nex": "node scripts/install.js",
         "reinstall-nex": "node scripts/install.js --reinstall"
+    },
+    "dependencies": {
+        "chalk": "^4.1.2"
     }
 }

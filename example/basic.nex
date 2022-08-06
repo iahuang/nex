@@ -13,6 +13,10 @@
     - !E is a set of pairs of objects from !V where each pair $\pair{v_1, v_2}$ is a set consisting of two distinct vertices and is called an edge of the graph. Order does not matter, that is, $\{v_1,v_@\}\equiv \{v_2,v_1\}$.
 }
 
+#m {
+    2pi+1
+}
+
 ```python
 class Node:
     pass # implementation goes here

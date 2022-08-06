@@ -1,3 +1,4 @@
+import { NexMathKeywords } from "./parser/nex_math/keywords";
 import { SourceLocation, SourceReference } from "./source";
 import { Token, TokenType } from "./token";
 import { sum } from "./util";
@@ -107,7 +108,7 @@ class TokenPattern {
  * Call `TokenMatcher.create()` to create a `TokenMatcher` instance fully populated
  * with patterns for all token types.
  */
-class TokenMatcher {
+export class TokenMatcher {
     private _tokenPatterns: Map<TokenType, TokenPattern>;
 
     private constructor() {
@@ -181,6 +182,7 @@ class TokenMatcher {
 
     static populated(): TokenMatcher {
         let pattern = new TokenMatcher();
+        let keywords = NexMathKeywords.populated();
 
         return (
             pattern
@@ -215,21 +217,44 @@ class TokenMatcher {
                 .addTokenPattern(TokenType.Whitespace, { string: " " })
                 .addTokenPattern(TokenType.LatexTextStart, { string: "\\text{" })
                 .addTokenPattern(TokenType.LatexEscapedBackslash, { string: "\\\\" })
-                .addTokenPattern(TokenType.LatexEscapedCurly, { matcher: (content) => {
-                    if (content.startsWith("\\{")) {
-                        return "\\{";
-                    }
+                .addTokenPattern(TokenType.LatexEscapedCurly, {
+                    matcher: (content) => {
+                        if (content.startsWith("\\{")) {
+                            return "\\{";
+                        }
 
-                    if (content.startsWith("\\}")) {
-                        return "\\}";
-                    }
+                        if (content.startsWith("\\}")) {
+                            return "\\}";
+                        }
 
-                    return null;
-                } })
+                        return null;
+                    },
+                })
                 .addTokenPattern(TokenType.LatexEscapedDollarSign, { string: "\\$" })
                 .addTokenPattern(TokenType.LatexCurlyStart, { string: "{" })
                 .addTokenPattern(TokenType.LatexCurlyEnd, { string: "}" })
                 .addTokenPattern(TokenType.LatexCharacter, { regex: /^./g })
+                .addTokenPattern(TokenType.NMKeyword, {
+                    matcher: (content) => {
+                        for (let keyword of keywords.getKeywords()) {
+                            if (content.startsWith(keyword.keyword)) {
+                                return keyword.keyword;
+                            }
+                        }
+
+                        return null;
+                    },
+                })
+                .addTokenPattern(TokenType.NMExponent, { string: "^" })
+                .addTokenPattern(TokenType.NMSubscript, { string: "_" })
+                .addTokenPattern(TokenType.NMFrac, { string: "/" })
+                .addTokenPattern(TokenType.NMParenLeft, { string: "(" })
+                .addTokenPattern(TokenType.NMParenRight, { string: ")" })
+                .addTokenPattern(TokenType.NMBracketLeft, { string: "[" })
+                .addTokenPattern(TokenType.NMBracketRight, { string: "]" })
+                .addTokenPattern(TokenType.NMCurlyLeft, { string: "{" })
+                .addTokenPattern(TokenType.NMCurlyRight, { string: "}" })
+                .addTokenPattern(TokenType.NMCharacter, { regex: /^[a-zA-Z\\.0-9]/g })
         );
     }
 }

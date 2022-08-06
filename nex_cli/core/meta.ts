@@ -1,7 +1,13 @@
+import { Version } from "./version";
+
 interface NexBuildMetadata {
-    version: string;
+    version: Version;
 }
 
 export let NEX_META: NexBuildMetadata = {
-    version: "0.0.1 (dev)",
+    version: {
+        major: 0,
+        minor: 0,
+        patch: 0
+    }
 };
