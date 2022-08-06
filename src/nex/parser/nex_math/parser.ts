@@ -11,10 +11,10 @@
  */
 
 import { LexingMode, TokenStream } from "../../lexer";
-import { TokenType } from "../../token";
+import { Token, TokenType } from "../../token";
 import { NexSyntaxError } from "../errors";
 import { ParserBase } from "../parser_base";
-import { NexMathKeywords } from "./keywords";
+import { NexMathKeyword, NexMathKeywords } from "./keywords";
 
 const MODE_NEX_MATH = new LexingMode(
     [
@@ -40,7 +40,7 @@ export abstract class MathNode {
 /**
  * A MathNode containing LaTeX code verbatim.
  */
-export class Verbatim extends MathNode {
+export class VerbatimLatex extends MathNode {
     content: string;
 
     constructor(content: string) {
@@ -154,12 +154,14 @@ export class Subscript extends MathNode {
  * be placed. For instance, the templace `\frac{$0}{$1}` indicates that
  * the first (zeroth) argument should be placed in the numerator of a,
  * LaTeX fraction, and the second argument in the denominator.
+ *
+ * This type of MathNode is used to represent NeX math functions.
  */
 export class LatexTemplate extends MathNode {
-    children: MathNode[];
+    children: (MathNode | null)[];
     template: string;
 
-    constructor(children: MathNode[], template: string) {
+    constructor(children: (MathNode | null)[], template: string) {
         super();
         this.children = children;
         this.template = template;
@@ -168,7 +170,10 @@ export class LatexTemplate extends MathNode {
     asLatex(): string {
         let output = this.template;
         for (let i = 0; i < this.children.length; i++) {
-            output = output.replaceAll("$" + i, this.children[i].asLatex());
+            output = output.replaceAll(
+                "$" + i,
+                this.children[i] ? this.children[i]!.asLatex() : ""
+            );
         }
 
         return output;
@@ -230,14 +235,14 @@ export class NexMathParser extends ParserBase {
         this.keywords = NexMathKeywords.populated();
     }
 
-    private _parseCharacters(starting: string): Verbatim {
+    private _parseCharacters(starting: string): VerbatimLatex {
         let content = starting;
 
         while (true) {
             let token = this.tokenStream.nextToken(MODE_NEX_MATH, { peek: true });
 
             if (!token) {
-                return new Verbatim(content);
+                return new VerbatimLatex(content);
             }
 
             // console.log("PC",token,token.tokenTypeName(),"\n");
@@ -246,7 +251,7 @@ export class NexMathParser extends ParserBase {
                 content += token.content;
                 this.tokenStream.consumeToken(token);
             } else {
-                return new Verbatim(content);
+                return new VerbatimLatex(content);
             }
         }
     }
@@ -260,13 +265,64 @@ export class NexMathParser extends ParserBase {
             }
 
             switch (token.type) {
-                case TokenType.NMKeyword:
-                    return new Verbatim(this.keywords.getLatexCode(token.content));
+                case TokenType.NMKeyword: {
+                    let keyword = this.keywords.getKeyword(token.content);
+
+                    // check whether this keyword takes arguments
+                    if (keyword.maxArguments > 0) {
+                        // this keyword takes arguments; check to see whether if
+                        // there are parentheses directly following it, indicating
+                        // that there are provided arguments
+
+                        let nextToken = this.tokenStream.nextToken(MODE_NEX_MATH, { peek: true });
+                        let providedArguments: (MathNode | null)[] = [];
+
+                        for (let i = 0; i < keyword.maxArguments; i++) {
+                            providedArguments.push(null);
+                        }
+
+                        if (nextToken && nextToken.type === TokenType.NMParenLeft) {
+                            // there seem to be provided arguments, parse as necessary
+
+                            this.tokenStream.consumeToken(nextToken);
+
+                            let argIndex = 0;
+
+                            while (true) {
+                                if (argIndex >= keyword.maxArguments) {
+                                    throw new NexSyntaxError(
+                                        this.getCurrentSourceLocation(),
+                                        `Too many arguments provided for NeX math keyword "${keyword.keyword}" (max ${keyword.maxArguments})`
+                                    );
+                                }
+
+                                let nextArgument = this._parseExpression([
+                                    TokenType.NMParenRight,
+                                    TokenType.NMArgumentSeparator,
+                                ]);
+
+                                providedArguments[argIndex] = nextArgument.expression;
+
+                                // Check whether we encountered a ")", indicating
+                                // the end of the passed arguments
+                                if (nextArgument.stoppedOn.type === TokenType.NMParenRight) {
+                                    break;
+                                }
+
+                                argIndex += 1;
+                            }
+                        }
+                        return new LatexTemplate(providedArguments, keyword.latexTemplate);
+                    } else {
+                        // Otherwise, just return the latex template verbatim
+                        return new VerbatimLatex(keyword.latexTemplate);
+                    }
+                }
                 case TokenType.NMCharacter:
                     return this._parseCharacters(token.content);
                 case TokenType.NMParenLeft:
                     return new Bracketed(
-                        this._parseExpression(TokenType.NMParenRight),
+                        this._parseExpression([TokenType.NMParenRight]).expression,
                         BracketType.Parentheses
                     );
                 case TokenType.NMFrac: {
@@ -311,19 +367,32 @@ export class NexMathParser extends ParserBase {
         }
     }
 
-    private _parseExpression(stopOnTokenType: TokenType): Expression {
+    /**
+     * Sequentially parse MathNodes into an `Expression` MathNode until
+     * one of the token types in `stopOnTokenTypes` is reached.
+     *
+     * Return the compiled `Expression` as well as the token that
+     * halted this method.
+     */
+    private _parseExpression(stopOnTokenTypes: TokenType[]): {
+        expression: Expression;
+        stoppedOn: Token;
+    } {
         let currentExpression = new Expression([]);
 
         while (true) {
             this.tokenStream.consumeWhitespace(true);
             let test = this.tokenStream.nextToken(
-                new LexingMode([stopOnTokenType], { skipWhitespace: false }),
+                new LexingMode(stopOnTokenTypes, { skipWhitespace: false }),
                 { peek: true }
             );
 
             if (test !== null) {
                 this.tokenStream.consumeToken(test);
-                return currentExpression;
+                return {
+                    expression: currentExpression,
+                    stoppedOn: test,
+                };
             }
 
             let nextNode = this._parseNextNode(
@@ -353,6 +422,6 @@ export class NexMathParser extends ParserBase {
      * Return the content converted to LaTeX code
      */
     parse(): string {
-        return this._parseExpression(TokenType.BlockEnd).asLatex();
+        return this._parseExpression([TokenType.BlockEnd]).expression.asLatex();
     }
 }

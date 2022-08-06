@@ -1,10 +1,11 @@
 import chalk from "chalk";
-import { HTMLGenerator } from "./generation/generator";
+import { HTMLBuilder } from "./generation/html";
 import { NEX_META } from "./meta";
 import { dump } from "./parser/ast";
 import { Parser } from "./parser/parser";
 import { SourceReference } from "./source";
-import { StringBuffer } from "./util";
+import { ThemeManager } from "./theme";
+import { FsUtil, StringBuffer } from "./util";
 import { asVersionString } from "./version";
 
 export interface Option {
@@ -357,9 +358,16 @@ export class NexCLI {
 
         let document = parser.parse();
 
+        let themeManager = new ThemeManager();
+        let generator = new HTMLBuilder();
+
         console.log(dump(document));
 
-        // let generator = new HTMLGenerator();
-        // console.log(generator.generateContentsAsHTML(document).asHTML());
+        let parts = FsUtil.entityName(settings.inputFile).split(".");
+
+        let outputFile =
+            (parts.slice(0, parts.length - 1).join(".") || "untitled_nex_document") + ".html";
+
+        generator.generateStandaloneHTML(document, outputFile, themeManager.loadTheme("latex"));
     }
 }

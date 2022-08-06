@@ -254,6 +254,7 @@ export class TokenMatcher {
                 .addTokenPattern(TokenType.NMBracketRight, { string: "]" })
                 .addTokenPattern(TokenType.NMCurlyLeft, { string: "{" })
                 .addTokenPattern(TokenType.NMCurlyRight, { string: "}" })
+                .addTokenPattern(TokenType.NMArgumentSeparator, { string: "," })
                 .addTokenPattern(TokenType.NMCharacter, { regex: /^[a-zA-Z\\.0-9]/g })
         );
     }

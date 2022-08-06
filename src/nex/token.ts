@@ -133,6 +133,8 @@ export enum TokenType {
     // "}"
     NMCurlyRight,
 
+    // "," used in the context of passing arguments to a keyword
+    NMArgumentSeparator,
 
     // TextCharacter, but for NeX math contexts
     NMCharacter,

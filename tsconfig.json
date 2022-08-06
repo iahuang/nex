@@ -1,18 +1,15 @@
 {
-  "compilerOptions": {
-    "target": "ES2015",
-    "module": "commonjs",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "outDir": "build",
-    "lib": ["ESNext"]
-  },
-  "exclude": [
-    "nex_frontend",
-    "scripts"
-  ],
-  "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "Recommended"
+    "compilerOptions": {
+        "target": "ES2015",
+        "module": "commonjs",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "outDir": "build",
+        "lib": ["ESNext"]
+    },
+    "exclude": ["scripts", "build"],
+    "$schema": "https://json.schemastore.org/tsconfig",
+    "display": "Recommended"
 }

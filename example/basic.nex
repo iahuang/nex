@@ -1,23 +1,32 @@
 :title Introduction to Graphs
-:latexdef pair 1 \{#1\}
 
-## Definitions
+## 2.3 The Formal Definition of Limit
 
-#callout {
-    :title Definition (Graph)
-
-    A graph is a pair of sets $(V,E)$ which are defined as follows:
-
-    - !V is a set of objects. Each element $V\{\}$ is called a vertex of the graph, and !V itself is called the set of vertices of the graph.
-
-    - !E is a set of pairs of objects from !V where each pair $\pair{v_1, v_2}$ is a set consisting of two distinct vertices and is called an edge of the graph. Order does not matter, that is, $\{v_1,v_@\}\equiv \{v_2,v_1\}$.
-}
+Recall that when we say
 
 #m {
-    log_b a = (ln a)/(ln b)
+    lim(x -> a)f(x) = L
 }
 
-```python
-class Node:
-    pass # implementation goes here
-```
+we should interpret this as "as !x approaches !a, $f(x)$ approaches !L". More specifically, "we can make $f(x)$
+arbitrarily close to !L by making !x arbitrarily close to !a". Recall the earlier definition of using absolute value
+for closeness. The notion of making !x arbitrarily close to !a can be thought of as writing a condition where,
+for some arbitrarily small $\delta$,
+
+#m {
+    abs(x-a) < delta
+}
+
+Remember that the notion of limit does not care exactly what happens at $x = a$. Thus, the distance from !x
+to !a, $|x - a|$, must also be greater than zero. Hence, we write
+
+#m {
+    0<abs(x-a)<delta
+}
+
+The other part of this interpretation says that we can make $f(x)$ arbitrarily close to !L by making $\delta$ arbitrarily
+small. So, for some arbitrarily small $\varepsilon$, the distance between $f(x)$ and !L is less than $\varepsilon$, thus,
+
+#m {
+    abs(f(x)-L)<epsilon
+}

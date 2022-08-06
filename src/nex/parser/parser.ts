@@ -279,11 +279,14 @@ export class Parser extends ParserBase {
 
                         // otherwise, trim leading whitespace and keep parsing the paragraph
                         this.tokenStream.consumeWhitespace(false);
+
+                        // add a space character
+                        paragraph.children.push(new Text(" "));
                     }
                     break;
                 case TokenType.ShorthandInlineMath:
                     this.tokenStream.consumeToken(token);
-                    parent.children.push(new InlineMath(token.content.slice(1)));
+                    paragraph.children.push(new InlineMath(token.content.slice(1)));
                     break;
                 case TokenType.EOF:
                     parent.children.push(paragraph);

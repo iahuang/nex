@@ -1,29 +1,46 @@
 body {
     margin: 0;
-    padding: 20px;
+    padding-left: 20vw;
+    padding-right: 20vw;
+    padding-top: 20px;
     font-family: "Computer Modern", sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
 }
 
 @font-face {
     font-family: "Computer Modern";
-    src: url("cmunrm.ttf");
+    src: url("assets://cmunrm.ttf");
+    font-weight: normal;
+    font-style: normal;
 }
+
 @font-face {
     font-family: "Computer Modern";
-    src: url("cmunbx.otf");
+    src: url("assets://cmunbx.ttf");
     font-weight: bold;
 }
+
 @font-face {
     font-family: "Computer Modern";
-    src: url("cmunti.ttf");
-    font-style: italic, oblique;
+    src: url("assets://cmunti.ttf");
+    font-weight: normal;
+    font-style: italic;
 }
+
 @font-face {
     font-family: "Computer Modern";
-    src: url("cmunbi.otf");
+    src: url("assets://cmunbi.ttf");
     font-weight: bold;
-    font-style: italic, oblique;
+    font-style: italic;
+}
+
+.katex {
+    font-size: 1.1em;
+}
+
+.document-title {
+    font-size: 24pt;
+    text-align: center;
+    display: block;
+    margin-top: 60px;
+    margin-bottom: 40px;
 }
