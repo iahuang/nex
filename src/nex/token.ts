@@ -133,6 +133,12 @@ export enum TokenType {
     // "}"
     NMCurlyRight,
 
+    // "${"
+    NexMathBlockStart,
+
+    // "}"
+    NexMathBlockEnd,
+
     // "," used in the context of passing arguments to a keyword
     NMArgumentSeparator,
 

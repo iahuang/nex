@@ -111,24 +111,14 @@ export class ThemeManager {
         }
     }
 
-    /**
-     * Load a theme from a theme name.
-     */
-    loadTheme(themeName: string): ThemeData {
+    loadThemeManifest(themeName: string): ThemeManifest {
         // ensure that theme name is valid
         if (!themeName.match(/^\w+$/g)) {
             panic(`Invalid theme name "${themeName}"`);
         }
 
         let themePath = FsUtil.joinPath(THEMES_PATH, themeName);
-        let assetDirectory = FsUtil.joinPath(themePath, "assets");
         let manifestPath = FsUtil.joinPath(themePath, "manifest.json");
-        let themeCSSPath = FsUtil.joinPath(themePath, "theme.css");
-
-        // ensure theme folder exists
-        if (!FsUtil.exists(themePath)) {
-            panic(`Theme "${themeName}" does not exist`);
-        }
 
         // load and validate manifest json data
         if (!FsUtil.exists(manifestPath)) {
@@ -144,6 +134,30 @@ export class ThemeManager {
                     manifestValidation.errors.map((error) => " - " + error).join("\n")
             );
         }
+
+        return manifestData;
+    }
+
+    /**
+     * Load a theme from a theme name.
+     */
+    loadTheme(themeName: string): ThemeData {
+        // ensure that theme name is valid
+        if (!themeName.match(/^\w+$/g)) {
+            panic(`Invalid theme name "${themeName}"`);
+        }
+
+        let themePath = FsUtil.joinPath(THEMES_PATH, themeName);
+        let assetDirectory = FsUtil.joinPath(themePath, "assets");
+        
+        let themeCSSPath = FsUtil.joinPath(themePath, "theme.css");
+
+        // ensure theme folder exists
+        if (!FsUtil.exists(themePath)) {
+            panic(`Theme "${themeName}" does not exist`);
+        }
+
+        let manifestData = this.loadThemeManifest(themeName);
 
         // load theme.css
         if (!FsUtil.exists(themeCSSPath)) {

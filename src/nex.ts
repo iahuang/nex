@@ -1,4 +1,3 @@
-import { NexCLI } from "./nex/cli";
+import { runCLI } from "./nex/cli";
 
-let cli = new NexCLI();
-cli.run();
+runCLI(process.argv);

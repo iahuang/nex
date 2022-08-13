@@ -4,29 +4,45 @@
 
 Recall that when we say
 
-#m {
-    lim(x -> a)f(x) = L
+${
+    lim(x -> a) f(x) = L
 }
 
 we should interpret this as "as !x approaches !a, $f(x)$ approaches !L". More specifically, "we can make $f(x)$
 arbitrarily close to !L by making !x arbitrarily close to !a". Recall the earlier definition of using absolute value
 for closeness. The notion of making !x arbitrarily close to !a can be thought of as writing a condition where,
-for some arbitrarily small $\delta$,
+for some arbitrarily small $delta$,
 
-#m {
+${
     abs(x-a) < delta
 }
 
 Remember that the notion of limit does not care exactly what happens at $x = a$. Thus, the distance from !x
-to !a, $|x - a|$, must also be greater than zero. Hence, we write
+to !a, $abs(x - a)$, must also be greater than zero. Hence, we write $x+1 = 1$
 
-#m {
-    0<abs(x-a)<delta
+${
+    0<abs(x-a)<delta + 1
 }
 
-The other part of this interpretation says that we can make $f(x)$ arbitrarily close to !L by making $\delta$ arbitrarily
-small. So, for some arbitrarily small $\varepsilon$, the distance between $f(x)$ and !L is less than $\varepsilon$, thus,
+The other part of this interpretation says that we can make $f(x)$ arbitrarily close to !L by making !epsilon arbitrarily
+small. So, for some arbitrarily small !epsilon, the distance between $f(x)$ and !L is less than !epsilon, thus,
 
-#m {
+${
     abs(f(x)-L)<epsilon
+}
+
+Finally, we say that the above statement is true, for an arbitrarily small distance between !x and !a. Hence,
+for some choice of !epsilon, where $abs(f (x) - L) < epsilon$, we can choose a !epsilon for which all values of $0 < abs(x - a) < delta$ satisfy
+this condition. This is written using the following definition of limit
+
+
+
+#callout {
+    :title Definition
+
+    We say that the limit as !x approaches !a equals !L, written $lim(x->a)=L$, when
+
+    ${
+        forall epsilon > 0, exists delta > 0 s.t. 0<abs(x-a)<delta implies abs(f(x)-L)<epsilon
+    }
 }

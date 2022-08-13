@@ -1,4 +1,6 @@
-export abstract class Element {}
+export abstract class Element {
+    __ = 1; // here only to prevent `Element` from being seen as an empty type by Typescript
+}
 
 export abstract class ContainerElement extends Element {
     children: Element[];

@@ -11,6 +11,7 @@ import {
     CodeBlock,
     ContainerElement,
     Document,
+    Element,
     Header,
     InlineMath,
     Paragraph,
@@ -29,7 +30,7 @@ const MODE_TOPLEVEL = new LexingMode(
         TokenType.H2,
         TokenType.H3,
         TokenType.H4,
-        TokenType.BlockMathModeBegin,
+        TokenType.NexMathBlockStart,
         TokenType.LangCodeBegin,
         TokenType.CodeBegin,
         TokenType.EOF,
@@ -49,7 +50,7 @@ const MODE_TOPLEVELCALLOUT = new LexingMode(
         TokenType.H2,
         TokenType.H3,
         TokenType.H4,
-        TokenType.BlockMathModeBegin,
+        TokenType.NexMathBlockStart,
         TokenType.LangCodeBegin,
         TokenType.CodeBegin,
         TokenType.BlockEnd,
@@ -139,7 +140,7 @@ export class Parser extends ParserBase {
     /**
      * To be invoked after a `BlockDeclaration` token is encountered
      */
-    private _parseBlock(parent: ContainerElement): void {
+    private _parseBlock(): Element {
         let blockNameToken = this._expectToken(TokenType.BlockName, { skipWhitespace: false });
 
         // Allowing newlines allows for the following syntax, where the bracket is on
@@ -158,13 +159,7 @@ export class Parser extends ParserBase {
         // Determine type of block and parse accordingly
         switch (blockName) {
             case "callout":
-                this._parseCallout(parent);
-                break;
-            case "diagram":
-                break;
-            case "m":
-                parent.children.push(new BlockMath(this.nexMathParser.parse()));
-                break;
+                return this._parseCallout();
             default:
                 throw new NexSyntaxError(
                     this.getCurrentSourceLocation(),
@@ -177,7 +172,7 @@ export class Parser extends ParserBase {
      * To be invoked after a `BlockName` token is encountered with content `"callout"`
      * (in the `_parseBlock` method)
      */
-    private _parseCallout(parent: ContainerElement): void {
+    private _parseCallout(): Callout {
         let callout = new Callout();
 
         while (true) {
@@ -201,11 +196,14 @@ export class Parser extends ParserBase {
                 }
             }
 
-            this._handleGenericTopLevelToken(token, callout, MODE_TOPLEVELCALLOUT);
+            let element = this._parseTopLevelToken(token, MODE_TOPLEVELCALLOUT);
+
+            if (element) {
+                callout.children.push(element);
+            }
 
             if (token.type === TokenType.BlockEnd) {
-                parent.children.push(callout);
-                return;
+                return callout;
             }
         }
     }
@@ -213,11 +211,7 @@ export class Parser extends ParserBase {
     /**
      * To be invoked when any inline element is encountered.
      */
-    private _parseParagraph(
-        parent: ContainerElement,
-        parentMode: LexingMode,
-        startingToken: Token
-    ): void {
+    private _parseParagraph(parentMode: LexingMode, startingToken: Token): Paragraph {
         let paragraph = new Paragraph();
         this.tokenStream.unconsumeToken(startingToken);
         this.tokenStream.consumeWhitespace(false);
@@ -228,18 +222,19 @@ export class Parser extends ParserBase {
 
             // if the next token can't be matched (e.g. EOF, let the parent environment handle it)
             if (!token) {
-                parent.children.push(paragraph);
-                return;
+                return paragraph;
             }
 
             switch (token.type) {
                 case TokenType.TextCharacter:
-                    this._parseText(paragraph);
+                    paragraph.children.push(this._parseText());
                     break;
-                case TokenType.InlineMathModeBegin:
+                case TokenType.InlineMathModeBegin: {
                     this.tokenStream.consumeToken(token);
-                    this._parseInlineMath(paragraph);
+                    let latex = this.nexMathParser.parseInline();
+                    paragraph.children.push(new InlineMath(latex));
                     break;
+                }
                 case TokenType.EOL:
                     // consume the token we peeked so we can peek the token after that
                     this.tokenStream.consumeToken(token);
@@ -258,23 +253,20 @@ export class Parser extends ParserBase {
                         // If, for whatever reason, we can't match any tokens,
                         // end the paragraph.
                         if (!nextToken) {
-                            parent.children.push(paragraph);
-                            return;
+                            return paragraph;
                         }
 
                         // If the next token is another EOL, i.e. the paragraph
                         // is followed by a blank line, end the paragraph
                         if (nextToken.type === TokenType.EOL) {
-                            parent.children.push(paragraph);
-                            return;
+                            return paragraph;
                         }
 
                         // If the next token isn't valid as an inline token, then
                         // we assume that the next token should end the current paragraph
                         // block.
                         if (!MODE_INLINE.validTokenTypes.includes(nextToken.type)) {
-                            parent.children.push(paragraph);
-                            return;
+                            return paragraph;
                         }
 
                         // otherwise, trim leading whitespace and keep parsing the paragraph
@@ -286,11 +278,10 @@ export class Parser extends ParserBase {
                     break;
                 case TokenType.ShorthandInlineMath:
                     this.tokenStream.consumeToken(token);
-                    paragraph.children.push(new InlineMath(token.content.slice(1)));
+                    paragraph.children.push(new InlineMath(this.nexMathParser.parseShorthand()));
                     break;
                 case TokenType.EOF:
-                    parent.children.push(paragraph);
-                    return;
+                    return paragraph;
                 default:
                     this._debug_unhandledTokenError(token);
             }
@@ -436,7 +427,7 @@ export class Parser extends ParserBase {
         }
     }
 
-    private _parseCodeBlock(parent: Paragraph, language: string | null): void {
+    private _parseCodeBlock(language: string | null): CodeBlock {
         let code = "";
 
         while (true) {
@@ -454,9 +445,7 @@ export class Parser extends ParserBase {
                     code += token.content;
                     break;
                 case TokenType.CodeEnd: {
-                    let codeElement = new CodeBlock(code, language);
-                    parent.children.push(codeElement);
-                    return;
+                    return new CodeBlock(code, language);
                 }
                 default:
                     this._debug_unhandledTokenError(token);
@@ -464,7 +453,7 @@ export class Parser extends ParserBase {
         }
     }
 
-    private _parseHeader(parent: ContainerElement, depth: number): void {
+    private _parseHeader(depth: number): Header {
         let content = new Paragraph();
         this.tokenStream.consumeWhitespace(false);
 
@@ -478,25 +467,23 @@ export class Parser extends ParserBase {
 
             switch (token.type) {
                 case TokenType.TextCharacter:
-                    this._parseText(content);
+                    content.children.push(this._parseText());
                     break;
                 case TokenType.InlineMathModeBegin:
                     this.tokenStream.consumeToken(token);
-                    this._parseInlineMath(content);
+                    content.children.push(new InlineMath(this.nexMathParser.parseInline()));
                     break;
                 case TokenType.EOF:
-                    parent.children.push(new Header(depth, content));
-                    return;
+                    return new Header(depth, content);
                 case TokenType.EOL:
-                    parent.children.push(new Header(depth, content));
-                    return;
+                    return new Header(depth, content);
                 default:
                     this._debug_unhandledTokenError(token);
             }
         }
     }
 
-    private _parseText(parent: Paragraph): void {
+    private _parseText(): Text {
         let text = "";
 
         while (true) {
@@ -528,9 +515,7 @@ export class Parser extends ParserBase {
 
                 let textElement = new Text(text);
 
-                parent.children.push(textElement);
-
-                break;
+                return textElement;
             }
         }
     }
@@ -570,40 +555,32 @@ export class Parser extends ParserBase {
      * (callout blocks, block math, etc.). Does not handle context-specific elements,
      * i.e. list item elements inside of list blocks.
      */
-    private _handleGenericTopLevelToken(
+    private _parseTopLevelToken(
         token: Token,
-        container: ContainerElement,
         parentMode: LexingMode
-    ): void {
+    ): Element | null {
         switch (token.type) {
             case TokenType.BlockDeclaration:
-                this._parseBlock(container);
-                break;
-            case TokenType.BlockMathModeBegin:
-                this._parseBlockMath(container);
-                break;
+                return this._parseBlock();
+            case TokenType.NexMathBlockStart:
+                return new BlockMath(this.nexMathParser.parseBlock());
             case TokenType.CodeBegin:
-                this._parseCodeBlock(container, null);
-                break;
+                return this._parseCodeBlock(null);
             case TokenType.LangCodeBegin:
-                this._parseCodeBlock(container, token.content.substring(3));
-                break;
+                return this._parseCodeBlock(token.content.substring(3));
             case TokenType.TextCharacter:
-                this._parseParagraph(container, parentMode, token);
-                break;
+                return this._parseParagraph(parentMode, token);
             case TokenType.H1:
-                this._parseHeader(container, 1);
-                break;
+                return this._parseHeader(1);
             case TokenType.H2:
-                this._parseHeader(container, 2);
-                break;
+                return this._parseHeader(2);
             case TokenType.H3:
-                this._parseHeader(container, 3);
-                break;
+                return this._parseHeader(3);
             case TokenType.H4:
-                this._parseHeader(container, 4);
-                break;
+                return this._parseHeader(4);
         }
+
+        return null;
     }
 
     parse(): Document {
@@ -616,7 +593,11 @@ export class Parser extends ParserBase {
                 this._unexpectedTokenError();
             }
 
-            this._handleGenericTopLevelToken(token, document, MODE_TOPLEVEL);
+            let element = this._parseTopLevelToken(token, MODE_TOPLEVEL);
+
+            if (element) {
+                document.children.push(element);
+            }
 
             let setting = this._handleSetting(token);
 

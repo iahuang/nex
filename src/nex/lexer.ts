@@ -212,7 +212,7 @@ export class TokenMatcher {
                 .addTokenPattern(TokenType.CodeBegin, { regex: /^```/g })
                 .addTokenPattern(TokenType.LangCodeBegin, { regex: /^```\w+/g })
                 .addTokenPattern(TokenType.CodeEnd, { string: "```" })
-                .addTokenPattern(TokenType.ShorthandInlineMath, { regex: /^!\w+/g })
+                .addTokenPattern(TokenType.ShorthandInlineMath, { regex: /^!(?=\w+)/g })
                 .addTokenPattern(TokenType.Comment, { string: "//" })
                 .addTokenPattern(TokenType.Whitespace, { string: " " })
                 .addTokenPattern(TokenType.LatexTextStart, { string: "\\text{" })
@@ -256,6 +256,8 @@ export class TokenMatcher {
                 .addTokenPattern(TokenType.NMCurlyRight, { string: "}" })
                 .addTokenPattern(TokenType.NMArgumentSeparator, { string: "," })
                 .addTokenPattern(TokenType.NMCharacter, { regex: /^[a-zA-Z\\.0-9]/g })
+                .addTokenPattern(TokenType.NexMathBlockStart, { string: "${" })
+                .addTokenPattern(TokenType.NexMathBlockEnd, { string: "}" })
         );
     }
 }

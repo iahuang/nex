@@ -1,373 +1,220 @@
 import chalk from "chalk";
+import { CLISchema, Option, OptionSettings, parseArgv } from "./argv_parser";
 import { HTMLBuilder } from "./generation/html";
-import { NEX_META } from "./meta";
-import { dump } from "./parser/ast";
+import { panic } from "./logging";
+import { NexSyntaxError } from "./parser/errors";
 import { Parser } from "./parser/parser";
 import { SourceReference } from "./source";
 import { ThemeManager } from "./theme";
 import { FsUtil, StringBuffer } from "./util";
-import { asVersionString } from "./version";
 
-export interface Option {
-    /**
-     * Full name of this option (e.g. `"verbose"` for `--verbose`)
-     */
-    name: string;
-    /**
-     * A single letter shortcut (e.g. for the option "--verbose", "-v" would
-     * work as a shortcut)
-     */
-    shortcut: string | null;
-    /**
-     * Description of this option for the help message
-     */
-    description: string | null;
-    /**
-     * Whether or not a value is expected following this option
-     */
-    requiresValue: boolean;
-    /**
-     * Name of the required value, if applicable (for the help message)
-     */
-    argumentName: string | null;
-    /**
-     * if a default is specified (i.e `Argument.default !== null`, then the argument becomes optional.)
-     */
-    default: string | null;
+function _makeOptionString(option: Option): string {
+    let first = option.shortcut ? `--${option.name}, -${option.shortcut}` : `--${option.name}`;
+
+    if (option.requiresArgument) {
+        return `${first} [${option.argumentDescription ?? "value"}]`;
+    }
+
+    return first;
 }
 
-export interface OptionSetting {
-    optionName: string;
-    value: string | null;
-}
+function _makeColoredOptionString(option: Option): string {
+    let first = option.shortcut ? `--${option.name}, -${option.shortcut}` : `--${option.name}`;
 
-export class Settings {
-    optionSettings: OptionSetting[];
-    inputFile: string | null;
-
-    constructor(settings: OptionSetting[], inputFile: string | null) {
-        this.optionSettings = settings;
-        this.inputFile = inputFile;
-    }
-
-    hasValueForOption(optName: string): boolean {
-        return this.getValueForOption(optName) !== null;
-    }
-
-    getValueForOption(optName: string): OptionSetting | null {
-        return this.getValuesForOption(optName)[0] ?? null;
-    }
-
-    getValuesForOption(optNmae: string): OptionSetting[] {
-        return this.optionSettings.filter((setting) => setting.optionName === optNmae);
-    }
-}
-
-export class ArgParser {
-    _options: Option[];
-
-    constructor() {
-        this._options = [];
-    }
-
-    addOption(arg: Option): void {
-        this._options.push({ ...arg }); // clone option object, just in case we were passed a mutable reference for some reason
-    }
-
-    /**
-     * Generate and return the help string, that is, what should be printed to stdout when
-     * the CLI is invoked with -h.
-     */
-    buildHelpString(): string {
-        let buffer = new StringBuffer();
-
-        buffer.writeln(
-            `Usage: nex ${chalk.cyanBright("[...options]")} ${chalk.magentaBright(
-                "[input file or directory]"
-            )}`
+    if (option.requiresArgument) {
+        return (
+            `${chalk.magentaBright(first)}` +
+            chalk.dim(chalk.magentaBright(` [${option.argumentDescription ?? "value"}]`))
         );
-        buffer.writeln();
-
-        buffer.writeln(chalk.bold("COMMAND LINE OPTIONS"));
-        buffer.writeln();
-
-        let leftColumn: { colored: boolean; text: string }[] = [];
-        let rightColumn: string[] = [];
-
-        for (let option of this._options) {
-            let argumentAppendix = option.argumentName ? ` [${option.argumentName}]` : "";
-
-            if (option.shortcut) {
-                leftColumn.push({
-                    colored: true,
-                    text: `--${option.name}, -${option.shortcut}` + argumentAppendix,
-                });
-            } else {
-                leftColumn.push({
-                    colored: true,
-                    text: `--${option.name}` + argumentAppendix,
-                });
-            }
-
-            rightColumn.push(option.description || "(No description provided)");
-
-            if (option.default) {
-                leftColumn.push({
-                    colored: false,
-                    text: "default:",
-                });
-                rightColumn.push(`${option.default}`);
-            }
-
-            leftColumn.push({
-                colored: false,
-                text: "",
-            });
-
-            rightColumn.push("");
-        }
-
-        let maxlen = Math.max(...leftColumn.map((col) => col.text.length));
-        const leftPadding = 2;
-        const separating = 2;
-
-        let i = 0;
-
-        while (i < rightColumn.length) {
-            let left = leftColumn[i];
-            let right = rightColumn[i];
-
-            buffer.write(" ".repeat(maxlen - left.text.length + leftPadding));
-            if (left.colored) {
-                buffer.write(chalk.cyanBright(left.text));
-            } else {
-                buffer.write(left.text);
-            }
-            buffer.write(" ".repeat(separating));
-            buffer.write(right + "\n");
-
-            i += 1;
-        }
-
-        return buffer.read();
     }
 
-    private _getOptionByName(optName: string): Option | null {
-        for (let option of this._options) {
-            if (option.name === optName.toLowerCase()) {
-                return option;
-            }
-        }
+    return chalk.magentaBright(first);
+}
 
-        return null;
+function printHelpMessage(schema: CLISchema): void {
+    let output = new StringBuffer();
+
+    output.writeln("Usage:", "nex", chalk.cyanBright("[mode]"), chalk.magentaBright("[options]"));
+    output.writeln();
+
+    let optionStrings: string[] = [];
+
+    for (let mode of schema.modes) {
+        optionStrings.push(...mode.options.map((opt) => _makeOptionString(opt)));
     }
 
-    private _getOptionByShorthandName(optShorthandName: string): Option | null {
-        for (let option of this._options) {
-            if (option.shortcut === optShorthandName) {
-                return option;
-            }
+    let maxOptionStringLength = Math.max(...optionStrings.map((s) => s.length));
+
+    output.writeln("Modes:");
+
+    const indentMode = " ".repeat(4);
+    const indentOption = " ".repeat(8);
+
+    for (let mode of schema.modes) {
+        output.writeln(indentMode + chalk.bold(mode.name.toUpperCase()) + "\n");
+        output.writeln(indentMode + mode.description);
+        output.write(indentMode + chalk.dim("Usage:"), "nex", chalk.cyanBright(mode.name));
+
+        if (mode.options.length > 0) {
+            output.write(" " + chalk.magentaBright("[options]"));
         }
 
-        return null;
+        if (mode.requiresInput) {
+            output.write(" " + chalk.greenBright(`[${mode.inputDescription}]`));
+        }
+
+        output.write("\n");
+
+        for (let option of mode.options) {
+            let optionString = _makeOptionString(option);
+            output.write(indentOption + " ".repeat(maxOptionStringLength - optionString.length));
+            output.write(_makeColoredOptionString(option));
+            output.write("  ");
+            output.writeln(option.description ?? "(No description provided)");
+        }
+
+        output.writeln("\n");
     }
 
-    private _throwError(message: string): never {
-        console.error(chalk.redBright("error: " + message));
-        process.exit(1);
+    process.stdout.write(output.read());
+}
+
+export function runCLI(argv: string[]): void {
+    let themeManager = new ThemeManager();
+    let themeList = themeManager.loadThemeList();
+
+    let cliSchema: CLISchema = {
+        globalOptions: [],
+        modes: [
+            {
+                name: "build",
+                description: "Builds the provided nex file to a standalone HTML file",
+                requiresInput: true,
+                inputDescription: "file or directory",
+                options: [
+                    {
+                        name: "out",
+                        shortcut: "o",
+                        description: "Specify output HTML path",
+                        argumentDescription: "path",
+                        requiresArgument: true,
+                        allowDuplicates: false,
+                    },
+                    {
+                        name: "theme",
+                        description: "Specify theme (default: latex)",
+                        argumentDescription: "theme",
+                        requiresArgument: true,
+                        allowDuplicates: false,
+                        validator: (theme, reject) => {
+                            if (!themeList.includes(theme)) {
+                                reject(`No such theme "${theme}" exists`);
+                            }
+                        },
+                    },
+                ],
+            },
+            {
+                name: "list-themes",
+                description: "Lists all available themes",
+                requiresInput: false,
+                options: [],
+            },
+            {
+                name: "help",
+                description: "Displays this message",
+                requiresInput: false,
+                options: [],
+            },
+        ],
+    };
+
+    let result = parseArgv(argv, cliSchema);
+
+    if (!result) {
+        printHelpMessage(cliSchema);
+        return;
     }
 
-    /**
-     * Return an object containing each passed option and their corresponding
-     * specified value (if applicable), in the order in which they were passed.
-     *
-     * Options with specified default values will be included at the end
-     * of this array.
-     *
-     * The passed value for `argv` *should* include the input file/directory at the end
-     * as well as `node` and the entry js file. In other words, pass `argv` as is
-     * from `process.argv`.
-     */
-    parse(argv: string[]): Settings {
-        // skip "node" and entry js path.
-        let i = 2;
+    if (result.error) {
+        panic(result.error);
+    }
 
-        let settings: OptionSetting[] = [];
-        let inputFile: string | null = null;
+    let parseResult = result.result!;
 
-        while (i < argv.length) {
-            let arg = argv[i];
-
-            let option: Option | null = null;
-
-            // Check if current argv argument is prefixed by "-" or "--"
-
-            if (arg.startsWith("--")) {
-                let optionName = arg.slice(2);
-
-                option = this._getOptionByName(optionName);
-
-                if (!option) {
-                    this._throwError(`Unknown option "${arg}". Invoke with -h to see options`);
-                }
-            } else if (arg.startsWith("-")) {
-                let argShorthandName = arg.slice(1);
-
-                option = this._getOptionByShorthandName(argShorthandName);
-
-                if (!option) {
-                    this._throwError(`Unknown option "${arg}". Invoke with -h to see options`);
-                }
-            }
-
-            if (option) {
-                let argumentValue: string | null = null;
-
-                if (option.requiresValue) {
-                    i += 1;
-
-                    argumentValue = argv[i];
-
-                    if (argumentValue === undefined) {
-                        this._throwError(
-                            `Option "--${option.name}" requires a value. Invoke with -h to see more information.`
-                        );
-                    }
-                }
-
-                settings.push({
-                    optionName: option.name,
-                    value: argumentValue,
-                });
-            } else {
-                if (inputFile === null) {
-                    inputFile = arg;
-                } else {
-                    this._throwError(`Can only specify one input file or directory`);
-                }
-            }
-
-            i += 1;
-        }
-
-        let settingsObject = new Settings(settings, inputFile);
-
-        // Add defaults
-        for (let option of this._options) {
-            if (option.default) {
-                if (!settingsObject.getValueForOption(option.name)) {
-                    settingsObject.optionSettings.push({
-                        optionName: option.name,
-                        value: option.default,
-                    });
-                }
-            }
-        }
-
-        return settingsObject;
+    switch (parseResult.mode) {
+        case "build":
+            build(parseResult.input!, parseResult.optionSettings, themeManager);
+            break;
+        case "list-themes":
+            listThemes(themeManager);
+            break;
+        case "help":
+            printHelpMessage(cliSchema);
+            break;
     }
 }
 
-export class NexCLI {
-    argParser: ArgParser;
+function listThemes(themeManager: ThemeManager): void {
+    let output = new StringBuffer();
 
-    constructor() {
-        this.argParser = new ArgParser();
+    output.writeln("Themes:");
+
+    let indent = " ".repeat(4);
+
+    for (let name of themeManager.loadThemeList()) {
+        let theme = themeManager.loadThemeManifest(name);
+
+        output.writeln(indent + chalk.bold(chalk.cyanBright(name)), "-", theme.displayName);
+        output.writeln(indent + chalk.dim("description:"), theme.description);
+        output.writeln(indent + chalk.dim("author:     "), theme.author);
+        output.writeln();
     }
 
-    printHelpMessage(): void {
-        console.log(this.argParser.buildHelpString());
+    process.stdout.write(output.read());
+}
+
+function displaySyntaxError(error: NexSyntaxError): void {
+    let output = new StringBuffer();
+
+    output.writeln("at", error.location.source.getPath() ?? "<anonymous>", "line " + error.location.line, "col " + error.location.col);
+    // subtract 1, since source location lines start at 1.
+    let offendingLine = error.location.source.getContent().split("\n")[error.location.line - 1];
+
+    output.writeln(" | " + offendingLine);
+    output.writeln("   " + " ".repeat(error.location.col - 1) + "^");
+    output.writeln("Syntax error: " + error.message);
+
+    process.stderr.write(chalk.redBright(output.read()));
+}
+
+function build(inputFile: string, settings: OptionSettings, themeManager: ThemeManager): void {
+    if (!FsUtil.exists(inputFile)) {
+        panic("No such file or directory");
     }
 
-    run(): void {
-        // init argparser
-        this.argParser.addOption({
-            name: "help",
-            shortcut: "h",
-            description: "Displays this message",
-            requiresValue: false,
-            argumentName: null,
-            default: null,
-        });
+    let parser = new Parser(SourceReference.fromPath(inputFile));
+    let generator = new HTMLBuilder();
+    let selectedTheme = settings.getOptionSetting("theme") ?? "latex";
 
-        this.argParser.addOption({
-            name: "version",
-            shortcut: null,
-            description: "Display version information",
-            requiresValue: false,
-            argumentName: null,
-            default: null,
-        });
+    let parts = FsUtil.entityName(inputFile).split(".");
+    let defaultOutputFile =
+        (parts.slice(0, parts.length - 1).join(".") || "untitled_nex_document") + ".html";
 
-        this.argParser.addOption({
-            name: "live",
-            shortcut: "l",
-            description: "Starts NeX in live mode",
-            requiresValue: false,
-            argumentName: null,
-            default: null,
-        });
-
-        this.argParser.addOption({
-            name: "port",
-            shortcut: null,
-            description: "Specifies a port to use for live mode",
-            requiresValue: true,
-            argumentName: "port",
-            default: "3000",
-        });
-
-        this.argParser.addOption({
-            name: "debug",
-            shortcut: "d",
-            description: "Starts NeX in debug mode",
-            requiresValue: false,
-            argumentName: null,
-            default: null,
-        });
-
-        this.argParser.addOption({
-            name: "out",
-            shortcut: null,
-            description: "Specify the name of the outputted HTML file, if using --build",
-            requiresValue: true,
-            argumentName: "path",
-            default: null,
-        });
-
-        let argv = process.argv;
-        let settings = this.argParser.parse(argv);
-
-        if (settings.hasValueForOption("help")) {
-            this.printHelpMessage();
-            process.exit(0);
-        }
-
-        if (settings.hasValueForOption("version")) {
-            console.log("NeX version " + chalk.greenBright(asVersionString(NEX_META.version)));
-            process.exit(0);
-        }
-
-        if (!settings.inputFile) {
-            console.error(chalk.redBright("error: No input file or directory specified\n"));
-            this.printHelpMessage();
-            process.exit(1);
-        }
-
-        let parser = new Parser(SourceReference.fromPath(argv[2]));
-
+    try {
         let document = parser.parse();
 
-        let themeManager = new ThemeManager();
-        let generator = new HTMLBuilder();
-
-        console.log(dump(document));
-
-        let parts = FsUtil.entityName(settings.inputFile).split(".");
-
-        let outputFile =
-            (parts.slice(0, parts.length - 1).join(".") || "untitled_nex_document") + ".html";
-
-        generator.generateStandaloneHTML(document, outputFile, themeManager.loadTheme("latex"));
+        generator.generateStandaloneHTML(
+            document,
+            settings.getOptionSetting("out") ?? defaultOutputFile,
+            themeManager.loadTheme(selectedTheme)
+        );
+    } catch (e) {
+        if (e instanceof NexSyntaxError) {
+            displaySyntaxError(e);
+            process.exit(1);
+        } else {
+            throw e;
+        }
     }
 }

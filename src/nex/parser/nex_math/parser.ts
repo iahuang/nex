@@ -14,7 +14,7 @@ import { LexingMode, TokenStream } from "../../lexer";
 import { Token, TokenType } from "../../token";
 import { NexSyntaxError } from "../errors";
 import { ParserBase } from "../parser_base";
-import { NexMathKeyword, NexMathKeywords } from "./keywords";
+import { NexMathKeywords } from "./keywords";
 
 const MODE_NEX_MATH = new LexingMode(
     [
@@ -417,11 +417,29 @@ export class NexMathParser extends ParserBase {
     }
 
     /**
-     * To be invoked directly following a `${` or math block start token (`{`).
+     * To be invoked directly following a `${`.
      *
      * Return the content converted to LaTeX code
      */
-    parse(): string {
+    parseBlock(): string {
         return this._parseExpression([TokenType.BlockEnd]).expression.asLatex();
+    }
+
+    /**
+     * To be invoked directly following a `!`.
+     *
+     * Return the content converted to LaTeX code
+     */
+    parseShorthand(): string {
+        return this._parseNextNode(null).asLatex();
+    }
+
+    /**
+     * To be invoked directly following a `$`
+     *
+     * Return the content converted to LaTeX code
+     */
+    parseInline(): string {
+        return this._parseExpression([TokenType.InlineMathModeEnd]).expression.asLatex();
     }
 }

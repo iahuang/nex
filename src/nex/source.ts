@@ -130,11 +130,11 @@ export class SourceReference {
     }
 
     /**
-     * Get underlying source path; if the source is anonymous, throw an error.
+     * Get underlying source path; if the source is anonymous, return `null`.
      */
-    getPath(): string {
+    getPath(): string | null {
         if (this.isAnonymous()) {
-            throw new Error("Cannot get path of anonymous source");
+            return null;
         }
 
         return unwrap(this._path);

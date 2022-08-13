@@ -3,6 +3,7 @@ body {
     padding-left: 20vw;
     padding-right: 20vw;
     padding-top: 20px;
+    padding-bottom: 40px;
     font-family: "Computer Modern", sans-serif;
 }
 
@@ -43,4 +44,29 @@ body {
     display: block;
     margin-top: 60px;
     margin-bottom: 40px;
+}
+
+.callout {
+    border: 2px black solid;
+    border-radius: 5px;
+    position: relative;
+    padding: 10px;
+    padding-top: 20px;
+}
+
+.callout-title {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background-color: black;
+    color: white;
+    padding-left: 10px;
+    padding-right: 10px;
+    box-sizing: border-box;
+}
+
+p {
+    margin-bottom: 8px;
+    margin-top: 8px;
 }

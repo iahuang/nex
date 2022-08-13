@@ -20,6 +20,10 @@ export class NexMathKeyword {
     }
 }
 
+function escapeRegex(string: string): string {
+    return string.replace(/[-\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
 export class NexMathKeywords {
     _keywords: Map<string, NexMathKeyword>;
 
@@ -49,6 +53,10 @@ export class NexMathKeywords {
 
     getKeywords(): NexMathKeyword[] {
         return Array.from(this._keywords.values());
+    }
+
+    generateRegexExpression(): string {
+        return `(${Array.from(this._keywords.keys()).map(n=>escapeRegex(n)).join("|")})`
     }
 
     static populated(): NexMathKeywords {
@@ -123,9 +131,9 @@ export class NexMathKeywords {
                 .addKeyword("AND", "\\land")
                 .addKeyword("OR", "\\lor")
                 // Arrows
+                .addKeyword("<-->", "\\longleftrightarrow")
                 .addKeyword("-->", "\\longrightarrow")
                 .addKeyword("<--", "\\longleftarrow")
-                .addKeyword("<-->", "\\longleftrightarrow")
                 .addKeyword("to")
                 .addKeyword("->", "\\to")
                 .addKeyword("gets")
