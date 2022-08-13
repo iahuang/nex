@@ -30,6 +30,20 @@ const MODE_NEX_MATH = new LexingMode(
     }
 );
 
+const MODE_NEX_MATH_CHARACTER = new LexingMode(
+    [
+        TokenType.NMFrac,
+        TokenType.NMExponent,
+        TokenType.NMSubscript,
+        TokenType.NMParenLeft,
+        TokenType.NMCharacter,
+        TokenType.NMKeyword,
+    ],
+    {
+        skipWhitespace: true,
+    }
+);
+
 /**
  * A generic math object that can be written as a LaTeX expression.
  */
@@ -239,7 +253,7 @@ export class NexMathParser extends ParserBase {
         let content = starting;
 
         while (true) {
-            let token = this.tokenStream.nextToken(MODE_NEX_MATH, { peek: true });
+            let token = this.tokenStream.nextToken(MODE_NEX_MATH_CHARACTER, { peek: true });
 
             if (!token) {
                 return new VerbatimLatex(content);
