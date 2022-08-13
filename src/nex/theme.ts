@@ -2,7 +2,6 @@ import { panic, logWarning } from "./logging";
 import { SchemaType } from "./schema";
 import { FsUtil } from "./util";
 
-const THEMES_PATH = "./resources/themes";
 
 export class ThemeData {
     manifest: ThemeManifest;
@@ -63,12 +62,18 @@ const manifestSchema = SchemaType.struct<ThemeManifest>({
 });
 
 export class ThemeManager {
+    themesDirectory: string;
+
+    constructor(themesDirectory: string) {
+        this.themesDirectory = themesDirectory;
+    }
+
     /**
      * Return a list of theme names, all of which can be passed
      * as an argument to `loadTheme()`
      */
     loadThemeList(): string[] {
-        let foldersInThemeDir = FsUtil.listDir(THEMES_PATH, { mode: "folders" });
+        let foldersInThemeDir = FsUtil.listDir(this.themesDirectory, { mode: "folders" });
         let themes = [];
 
         for (let folder of foldersInThemeDir) {
@@ -117,7 +122,7 @@ export class ThemeManager {
             panic(`Invalid theme name "${themeName}"`);
         }
 
-        let themePath = FsUtil.joinPath(THEMES_PATH, themeName);
+        let themePath = FsUtil.joinPath(this.themesDirectory, themeName);
         let manifestPath = FsUtil.joinPath(themePath, "manifest.json");
 
         // load and validate manifest json data
@@ -147,9 +152,9 @@ export class ThemeManager {
             panic(`Invalid theme name "${themeName}"`);
         }
 
-        let themePath = FsUtil.joinPath(THEMES_PATH, themeName);
+        let themePath = FsUtil.joinPath(this.themesDirectory, themeName);
         let assetDirectory = FsUtil.joinPath(themePath, "assets");
-        
+
         let themeCSSPath = FsUtil.joinPath(themePath, "theme.css");
 
         // ensure theme folder exists

@@ -79,8 +79,8 @@ function printHelpMessage(schema: CLISchema): void {
     process.stdout.write(output.read());
 }
 
-export function runCLI(argv: string[]): void {
-    let themeManager = new ThemeManager();
+export function runCLI(argv: string[], resourcesPath: string): void {
+    let themeManager = new ThemeManager(FsUtil.joinPath(resourcesPath, "themes"));
     let themeList = themeManager.loadThemeList();
 
     let cliSchema: CLISchema = {
