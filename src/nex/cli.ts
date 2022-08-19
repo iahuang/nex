@@ -112,6 +112,12 @@ export function runCLI(argv: string[], resourcesPath: string): void {
                             }
                         },
                     },
+                    {
+                        name: "debug",
+                        description: "Output additional information for debug purposes",
+                        requiresArgument: false,
+                        allowDuplicates: false,
+                    },
                 ],
             },
             {
@@ -142,10 +148,23 @@ export function runCLI(argv: string[], resourcesPath: string): void {
 
     let parseResult = result.result!;
 
+    let settings = parseResult.optionSettings;
+
     switch (parseResult.mode) {
-        case "build":
-            build(parseResult.input!, parseResult.optionSettings, themeManager);
+        case "build": {
+            let parts = FsUtil.entityName(parseResult.input!).split(".");
+            let defaultOutputFile =
+                (parts.slice(0, parts.length - 1).join(".") || "untitled_nex_document") + ".html";
+
+            build({
+                inputFile: parseResult.input!,
+                outputFile: settings.getOptionSetting("out") ?? defaultOutputFile,
+                theme: settings.getOptionSetting("theme") ?? "latex",
+                themeManager: themeManager,
+                debug: settings.hasOption("debug"),
+            });
             break;
+        }
         case "list-themes":
             listThemes(themeManager);
             break;
@@ -177,7 +196,12 @@ function listThemes(themeManager: ThemeManager): void {
 function displaySyntaxError(error: NexSyntaxError): void {
     let output = new StringBuffer();
 
-    output.writeln("at", error.location.source.getPath() ?? "<anonymous>", "line " + error.location.line, "col " + error.location.col);
+    output.writeln(
+        "at",
+        error.location.source.getPath() ?? "<anonymous>",
+        "line " + error.location.line,
+        "col " + error.location.col
+    );
     // subtract 1, since source location lines start at 1.
     let offendingLine = error.location.source.getContent().split("\n")[error.location.line - 1];
 
@@ -188,30 +212,36 @@ function displaySyntaxError(error: NexSyntaxError): void {
     process.stderr.write(chalk.redBright(output.read()));
 }
 
-function build(inputFile: string, settings: OptionSettings, themeManager: ThemeManager): void {
-    if (!FsUtil.exists(inputFile)) {
+function build(args: {
+    inputFile: string;
+    outputFile: string;
+    theme: string;
+    themeManager: ThemeManager;
+    debug: boolean;
+}): void {
+    if (!FsUtil.exists(args.inputFile)) {
         panic("No such file or directory");
     }
 
-    let parser = new Parser(SourceReference.fromPath(inputFile));
+    let parser = new Parser(SourceReference.fromPath(args.inputFile));
     let generator = new HTMLBuilder();
-    let selectedTheme = settings.getOptionSetting("theme") ?? "latex";
-
-    let parts = FsUtil.entityName(inputFile).split(".");
-    let defaultOutputFile =
-        (parts.slice(0, parts.length - 1).join(".") || "untitled_nex_document") + ".html";
 
     try {
         let document = parser.parse();
 
         generator.generateStandaloneHTML(
             document,
-            settings.getOptionSetting("out") ?? defaultOutputFile,
-            themeManager.loadTheme(selectedTheme)
+            args.outputFile,
+            args.themeManager.loadTheme(args.theme)
         );
     } catch (e) {
         if (e instanceof NexSyntaxError) {
             displaySyntaxError(e);
+
+            if (args.debug) {
+                console.error(chalk.dim(chalk.redBright(e.stack)));
+            }
+
             process.exit(1);
         } else {
             throw e;

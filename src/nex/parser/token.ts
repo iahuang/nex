@@ -1,4 +1,4 @@
-import { SourceReference, SourceLocation } from "./source";
+import { SourceReference, SourceLocation } from "../source";
 
 export enum TokenType {
     // a "#" followed by a letter (not included)

@@ -10,8 +10,8 @@
  * current source location of the main parser.
  */
 
-import { LexingMode, TokenStream } from "../../lexer";
-import { Token, TokenType } from "../../token";
+import { LexingMode, TokenStream } from "../lexer";
+import { Token, TokenType } from "../token";
 import { NexSyntaxError } from "../errors";
 import { ParserBase } from "../parser_base";
 import { NexMathKeywords } from "./keywords";
@@ -275,7 +275,7 @@ export class NexMathParser extends ParserBase {
             let token = this.tokenStream.nextToken(MODE_NEX_MATH);
 
             if (!token) {
-                this._unexpectedTokenError();
+                this.unexpectedTokenError();
             }
 
             switch (token.type) {
@@ -376,7 +376,7 @@ export class NexMathParser extends ParserBase {
                     return new Subscript(previousNode, stripParentheses(exponent));
                 }
                 default:
-                    this._debug_unhandledTokenError(token);
+                    this.debug_unhandledTokenError(token);
             }
         }
     }
@@ -455,5 +455,14 @@ export class NexMathParser extends ParserBase {
      */
     parseInline(): string {
         return this._parseExpression([TokenType.InlineMathModeEnd]).expression.asLatex();
+    }
+
+    /**
+     * To be invoked directly following a Desmos `:equation` setting
+     *
+     * Return the content converted to LaTeX code
+     */
+    parseSetting(): string {
+        return this._parseExpression([TokenType.EOL]).expression.asLatex();
     }
 }

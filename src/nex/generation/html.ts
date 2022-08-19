@@ -2,6 +2,7 @@ import {
     BlockMath,
     Callout,
     CodeBlock,
+    DesmosElement,
     Document,
     Element,
     Header,
@@ -24,6 +25,11 @@ for (let element of document.querySelectorAll(".block-math")) {
         throwOnError: false,
         displayMode: true
     });
+}
+
+for (let element of document.querySelectorAll(".calculator")) {
+    let calculator = Desmos.GraphingCalculator(element, {expressions: false});
+    calculator.setExpression({id: "graph1", latex: element.dataset.equation});
 }
 `;
 
@@ -88,7 +94,7 @@ export class HTMLElement extends HTMLNode {
         let childContent = this.children.map((child) => child.asHTML()).join("");
         let attrs = Object.keys(this.attrs)
             .map((attr) => {
-                return `${attr}=${JSON.stringify(this.attrs[attr])}`;
+                return `${attr}="${this.attrs[attr]}"`;
             })
             .join(" ");
         return `<${this.tagName} ${attrs}>${childContent}</${this.tagName}>`;
@@ -148,6 +154,13 @@ export class HTMLBuilder {
             }
 
             return callout;
+        } else if (element instanceof DesmosElement) {
+            let desmos = div({
+                class: "calculator",
+                "data-equation": element.latexEquation,
+                style: "width: 600px; height: 400px;",
+            });
+            return desmos;
         } else if (element instanceof CodeBlock) {
             let codeBlock = makeElement("code", { class: "language-" + element.language }, [
                 textNode(element.content),
@@ -205,10 +218,11 @@ export class HTMLBuilder {
         let stylesheetElement = `<style>${themeData.getPackedCSS()}</style>`;
         let katexStyleElement = `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.css" crossorigin="anonymous">`;
         let katexSrcElement = `<script src="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.js" integrity="sha384-X/XCfMm41VSsqRNQgDerQczD69XqmjOOOwYQvr/uuC+j4OPoNhVgjdGFwhvN02Ja" crossorigin="anonymous"></script>`;
+        let desmosSrcElement = `<script src="https://www.desmos.com/api/v1.7/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6"></script>`;
 
         let htmlRoot = makeElement("html", {}, [
             new HTMLVerbatim(
-                `<head>${katexStyleElement}${katexSrcElement}${stylesheetElement}</head>`
+                `<head>${katexStyleElement}${katexSrcElement}${stylesheetElement}${desmosSrcElement}</head>`
             ),
             makeElement("body", {}, [
                 this.generateContentsAsHTML(document),

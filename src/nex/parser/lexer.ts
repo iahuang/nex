@@ -1,7 +1,8 @@
-import { NexMathKeywords } from "./parser/nex_math/keywords";
-import { SourceLocation, SourceReference } from "./source";
-import { Token, TokenType } from "./token";
-import { sum } from "./util";
+import { SourceLocation, SourceReference } from "../source";
+import { TokenType, Token } from "./token";
+import { sum } from "../util";
+import { userFriendlyCharacterRepresentation } from "./errors";
+import { NexMathKeywords } from "./nex_math/keywords";
 
 export interface LexingModeOptions {
     skipWhitespace: boolean;
@@ -450,25 +451,15 @@ export class TokenStream {
      * to match any tokens (i.e. we assume that the first character of the remaining content
      * is invalid).
      */
-    unexpectedTokenError(expectedCharacter?: string): string {
+    unexpectedTokenErrorMessage(expectedCharacter?: string): string {
         let offendingCharacter = this.getRemainingContent()[0];
 
-        if (offendingCharacter === undefined) {
-            offendingCharacter = "[EOF]";
-        }
-
-        if (offendingCharacter === "\n") {
-            offendingCharacter = "[Newline]";
-        }
-
-        if (offendingCharacter === "\t") {
-            offendingCharacter = "[Tab]";
-        }
-
-        let message = `Unexpected character "${offendingCharacter}"`;
+        let message = `Unexpected character "${userFriendlyCharacterRepresentation(
+            offendingCharacter
+        )}"`;
 
         if (expectedCharacter) {
-            message += `; expected "${expectedCharacter}"`;
+            message += `; expected "${userFriendlyCharacterRepresentation(expectedCharacter)}"`;
         }
 
         if (offendingCharacter === "[EOF]") {

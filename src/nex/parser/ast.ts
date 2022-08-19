@@ -105,6 +105,16 @@ export class InlineMath extends Textual {
     }
 }
 
+export class DesmosElement extends Element {
+    latexEquation: string;
+
+    constructor(latexExpression: string) {
+        super();
+
+        this.latexEquation = latexExpression;
+    }
+}
+
 /**
  * Return `text` with all lines indented by `indent * 4` spaces.
  */

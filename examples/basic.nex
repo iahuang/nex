@@ -46,3 +46,7 @@ this condition. This is written using the following definition of limit
         forall epsilon > 0, exists delta > 0 s.t. 0<abs(x-a)<delta implies abs(f(x)-L)<epsilon
     }
 }
+
+#desmos {
+    :equation $e^(x+1)$
+}

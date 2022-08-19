@@ -10,3 +10,27 @@ export class NexSyntaxError extends Error {
         this.message = message;
     }
 }
+
+/**
+ * **Example**
+ * ```
+ * > console.log(userFriendlyCharacterRepresentation("A"));
+ * "A"
+ * > console.log(userFriendlyCharacterRepresentation(" "));
+ * [Space]
+ * > console.log(userFriendlyCharacterRepresentation("\n"));
+ * [Newline]
+ * ```
+ */
+export function userFriendlyCharacterRepresentation(character: string): string {
+    switch (character) {
+        case " ":
+            return "[Space]";
+        case "\t":
+            return "[Tab]";
+        case "\n":
+            return "[Newline]";
+        default:
+            return `"${character}"`;
+    }
+}
