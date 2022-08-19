@@ -10,6 +10,23 @@ NeX is designed to be an alternative to LaTeX for a wide variety of similar use 
 
 To see examples of NeX syntax, see the `examples/` folder.
 
+## Features
+
+- **Based off Markdown**
+NeX aims to largely exist as a superset of Markdown, a common markup syntax. Many syntax rules such as using
+astrisks (`*`) for italics and double astrisks (`**`) for bold should feel familiar.
+
+- **Custom math syntax**
+NeX uses a custom LaTeX-based syntax for writing math that is designed to feel more intuitive, faster to write, and easier to read,
+yet still retain the same flexibility as LaTeX.
+
+- **Desmos integration**
+NeX makes use of the Desmos API to allow you to embed Desmos graphs directly into your documents.
+
+- **Theme support**
+NeX includes several themes to customize the look of your documents. You can also easily create your own themes using plain CSS. 
+
+
 ## Installation
 
 You need to have Node.js (v14 or higher) installed to run NeX. 
