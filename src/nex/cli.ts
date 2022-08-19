@@ -108,7 +108,7 @@ export function runCLI(argv: string[], resourcesPath: string): void {
                         allowDuplicates: false,
                         validator: (theme, reject) => {
                             if (!themeList.includes(theme)) {
-                                reject(`No such theme "${theme}" exists`);
+                                reject(`No such theme "${theme}" exists. For a list of themes, use "nex list-themes"`);
                             }
                         },
                     },
@@ -177,7 +177,7 @@ export function runCLI(argv: string[], resourcesPath: string): void {
 function listThemes(themeManager: ThemeManager): void {
     let output = new StringBuffer();
 
-    output.writeln("Themes:");
+    output.writeln();
 
     let indent = " ".repeat(4);
 
@@ -185,8 +185,12 @@ function listThemes(themeManager: ThemeManager): void {
         let theme = themeManager.loadThemeManifest(name);
 
         output.writeln(indent + chalk.bold(chalk.cyanBright(name)), "-", theme.displayName);
-        output.writeln(indent + chalk.dim("description:"), theme.description);
-        output.writeln(indent + chalk.dim("author:     "), theme.author);
+        output.writeln(indent + chalk.dim("description:            "), chalk.italic(theme.description));
+        output.writeln(indent + chalk.dim("author:                 "), theme.author);
+        output.writeln(
+            indent + chalk.dim("includes custom assets: "),
+            theme.packAssets.length > 0 ? chalk.yellowBright("Yes") : chalk.greenBright("No")
+        );
         output.writeln();
     }
 
@@ -207,6 +211,12 @@ function displaySyntaxError(error: NexSyntaxError): void {
         )
     );
     output.writeln(chalk.bold(chalk.redBright("error:"), error.message));
+    if (error.location.line > 1) {
+        // subtract 1, since source location lines start at 1.
+        let offendingLine = error.location.source.getContent().split("\n")[error.location.line - 2];
+
+        output.writeln(chalk.dim(" | ") + offendingLine);
+    }
     // subtract 1, since source location lines start at 1.
     let offendingLine = error.location.source.getContent().split("\n")[error.location.line - 1];
 

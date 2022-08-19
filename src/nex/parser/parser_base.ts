@@ -1,5 +1,5 @@
 import { SourceLocation } from "../source";
-import { NexSyntaxError } from "./errors";
+import { NexSyntaxError, userFriendlyCharacterRepresentation } from "./errors";
 import { TokenStream, LexingModeOptions, LexingMode } from "./lexer";
 import { TokenType, Token } from "./token";
 
@@ -56,7 +56,7 @@ export abstract class ParserBase {
      */
     protected debug_unhandledTokenError(token: Token): never {
         this.throwSyntaxError(
-            `Unhandled token "${token.content}" with type ${token.tokenTypeName()}`,
+            `Unhandled token ${userFriendlyCharacterRepresentation(token.content)} with type ${token.tokenTypeName()}`,
             token
         );
     }

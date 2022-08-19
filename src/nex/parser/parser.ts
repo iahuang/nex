@@ -75,12 +75,9 @@ const MODE_INLINE = new LexingMode(
     }
 );
 
-const MODE_DESMOS_BLOCK = new LexingMode(
-    [TokenType.SettingDeclaration, TokenType.BlockEnd, TokenType.EOL],
-    {
-        skipWhitespace: true,
-    }
-);
+const MODE_DESMOS_BLOCK = new LexingMode([TokenType.BlockEnd, TokenType.EOL], {
+    skipWhitespace: true,
+});
 
 const MODE_CODE_BLOCK = new LexingMode(
     [TokenType.CodeEnd, TokenType.EOL, TokenType.TextCharacter],
@@ -185,10 +182,22 @@ export class Parser extends ParserBase {
     }
 
     private _parseDesmos(): DesmosElement {
-        let equation: string | null = null;
         let start = this.getCurrentSourceLocation();
+        let settingHandler = this.createSettingHandler([
+            {
+                name: "equation",
+                allowDuplicates: true,
+                requiresArgument: true,
+                handler: () => {
+                    this.expectToken(TokenType.InlineMathModeBegin, { skipWhitespace: true });
+                    return this.nexMathParser.parseInline();
+                },
+            },
+        ]);
 
         while (true) {
+            settingHandler.handle();
+
             let token = this.tokenStream.nextToken(MODE_DESMOS_BLOCK);
 
             if (!token) {
@@ -196,27 +205,14 @@ export class Parser extends ParserBase {
             }
 
             switch (token.type) {
-                case TokenType.SettingDeclaration: {
-                    let settingName = this.expectToken(TokenType.SettingName, {
-                        skipWhitespace: false,
-                    }).content;
+                case TokenType.BlockEnd: {
+                    let equation = settingHandler.getSettingValue("equation");
 
-                    this.expectToken(TokenType.InlineMathModeBegin, {
-                        skipWhitespace: true,
-                        allowNewlines: true,
-                    });
-
-                    switch (settingName) {
-                        case "equation":
-                            equation = this.nexMathParser.parseInline();
-                    }
-                    break;
-                }
-                case TokenType.BlockEnd:
                     if (!equation) {
                         this.throwSyntaxError("Desmos block must have an equation", start);
                     }
                     return new DesmosElement(equation);
+                }
             }
         }
     }

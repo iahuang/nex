@@ -1,6 +1,6 @@
 {
     "displayName": "LaTeX",
     "description": "The default, LaTeX-inspired theme",
-    "author": "Ian Huang",
+    "author": "NeX",
     "packAssets": ["cmunbi.ttf", "cmunbx.ttf", "cmunrm.ttf", "cmunti.ttf"]
 }
