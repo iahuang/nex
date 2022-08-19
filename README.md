@@ -1,5 +1,7 @@
 # NeX
 
+![NeX Logo](https://github.com/iahuang/nex/raw/main/readme_assets/nex_logo.png)
+
 NeX is a markup language with lightweight syntax designed for note-taking and drafting documents, especially for fields of study related to mathematics and computer science.
 
 > **NOTE:** This project is in early development stages. Use with caution.
@@ -7,6 +9,8 @@ NeX is a markup language with lightweight syntax designed for note-taking and dr
 ### Motivation
 
 NeX is designed to be an alternative to LaTeX for a wide variety of similar use cases. NeX greatly reduces the complexity in typing math equations (see **NeX Math**), facilitates the inclusion of a variety of different formatting elements without the need for external packages, and provides ways to create more complex visual elements such as diagrams and graphs using similarly intuitive syntax.
+
+![NeX Logo](https://github.com/iahuang/nex/raw/main/readme_assets/demo_screenshot_limits.png)
 
 To see examples of NeX syntax, see the `examples/` folder.
 
