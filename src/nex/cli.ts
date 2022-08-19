@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { CLISchema, Option, OptionSettings, parseArgv } from "./argv_parser";
+import { CLISchema, Option, parseArgv } from "./argv_parser";
 import { HTMLBuilder } from "./generation/html";
 import { panic } from "./logging";
 import { NexSyntaxError } from "./parser/errors";
@@ -198,18 +198,22 @@ function displaySyntaxError(error: NexSyntaxError): void {
 
     output.writeln(
         "at",
-        error.location.source.getPath() ?? "<anonymous>",
-        "line " + error.location.line,
-        "col " + error.location.col
+        chalk.cyanBright(
+            (error.location.source.getPath() ?? "<anonymous>") +
+                ":" +
+                error.location.line +
+                ":" +
+                error.location.col
+        )
     );
+    output.writeln(chalk.bold(chalk.redBright("error:"), error.message));
     // subtract 1, since source location lines start at 1.
     let offendingLine = error.location.source.getContent().split("\n")[error.location.line - 1];
 
-    output.writeln(" | " + offendingLine);
-    output.writeln("   " + " ".repeat(error.location.col - 1) + "^");
-    output.writeln("Syntax error: " + error.message);
+    output.writeln(chalk.dim(" | ") + offendingLine);
+    output.writeln(chalk.redBright("   " + " ".repeat(error.location.col - 1) + "^"));
 
-    process.stderr.write(chalk.redBright(output.read()));
+    process.stderr.write(output.read());
 }
 
 function build(args: {

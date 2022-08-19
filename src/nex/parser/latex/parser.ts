@@ -1,7 +1,6 @@
 import { LexingMode, TokenStream } from "../lexer";
 import { TokenType } from "../token";
 import { Paragraph, InlineMath, ContainerElement, BlockMath } from "../ast";
-import { NexSyntaxError } from "../errors";
 import { ParserBase } from "../parser_base";
 
 const MODE_INLINE_MATH = new LexingMode(

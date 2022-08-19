@@ -454,12 +454,12 @@ export class TokenStream {
     unexpectedTokenErrorMessage(expectedCharacter?: string): string {
         let offendingCharacter = this.getRemainingContent()[0];
 
-        let message = `Unexpected character "${userFriendlyCharacterRepresentation(
+        let message = `Unexpected character ${userFriendlyCharacterRepresentation(
             offendingCharacter
-        )}"`;
+        )}`;
 
         if (expectedCharacter) {
-            message += `; expected "${userFriendlyCharacterRepresentation(expectedCharacter)}"`;
+            message += `; expected ${userFriendlyCharacterRepresentation(expectedCharacter)}`;
         }
 
         if (offendingCharacter === "[EOF]") {
