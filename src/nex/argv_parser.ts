@@ -111,7 +111,7 @@ export function parseArgv(
         if (!option) {
             return {
                 result: null,
-                error: `Invalid option "${arg}". Use "nex help" for a list of options`,
+                error: `Invalid option "${arg}" for mode "${modeName}". Use "nex help" for a list of options`,
             };
         }
 

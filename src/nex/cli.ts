@@ -4,6 +4,7 @@ import { HTMLBuilder } from "./generation/html";
 import { panic } from "./logging";
 import { NexSyntaxError } from "./parser/errors";
 import { Parser } from "./parser/parser";
+import { resolveResourcePath } from "./resources";
 import { SourceReference } from "./source";
 import { ThemeManager } from "./theme";
 import { FsUtil, StringBuffer } from "./util";
@@ -24,7 +25,7 @@ function _makeColoredOptionString(option: Option): string {
     if (option.requiresArgument) {
         return (
             `${chalk.magentaBright(first)}` +
-            chalk.dim(chalk.magentaBright(` [${option.argumentDescription ?? "value"}]`))
+            chalk.italic(chalk.dim(chalk.magentaBright(` [${option.argumentDescription ?? "value"}]`)))
         );
     }
 
@@ -70,7 +71,17 @@ function printHelpMessage(schema: CLISchema): void {
             output.write(indentOption + " ".repeat(maxOptionStringLength - optionString.length));
             output.write(_makeColoredOptionString(option));
             output.write("  ");
-            output.writeln(option.description ?? "(No description provided)");
+
+            let i = 0;
+            for (let line of (option.description ?? "(No description provided)").split("\n")) {
+                if (i > 0) {
+                    output.write(indentOption + " ".repeat(maxOptionStringLength) + "  ");
+                }
+
+                output.writeln(line);
+
+                i += 1;
+            }
         }
 
         output.writeln("\n");
@@ -79,8 +90,8 @@ function printHelpMessage(schema: CLISchema): void {
     process.stdout.write(output.read());
 }
 
-export function runCLI(argv: string[], resourcesPath: string): void {
-    let themeManager = new ThemeManager(FsUtil.joinPath(resourcesPath, "themes"));
+export function runCLI(argv: string[]): void {
+    let themeManager = new ThemeManager(resolveResourcePath("themes"));
     let themeList = themeManager.loadThemeList();
 
     let cliSchema: CLISchema = {
@@ -108,13 +119,22 @@ export function runCLI(argv: string[], resourcesPath: string): void {
                         allowDuplicates: false,
                         validator: (theme, reject) => {
                             if (!themeList.includes(theme)) {
-                                reject(`No such theme "${theme}" exists. For a list of themes, use "nex list-themes"`);
+                                reject(
+                                    `No such theme "${theme}" exists. For a list of themes, use "nex list-themes"`
+                                );
                             }
                         },
                     },
                     {
                         name: "debug",
                         description: "Output additional information for debug purposes",
+                        requiresArgument: false,
+                        allowDuplicates: false,
+                    },
+                    {
+                        name: "offline",
+                        description:
+                            "Download and bundle external dependencies (e.g. KaTeX) so that the generated HTML file can be viewed offline.\nThis may substantially increase the size of the outputted HTML file.",
                         requiresArgument: false,
                         allowDuplicates: false,
                     },
@@ -129,6 +149,12 @@ export function runCLI(argv: string[], resourcesPath: string): void {
             {
                 name: "help",
                 description: "Displays this message",
+                requiresInput: false,
+                options: [],
+            },
+            {
+                name: "clear-cache",
+                description: "Removes cached dependency files",
                 requiresInput: false,
                 options: [],
             },
@@ -162,6 +188,7 @@ export function runCLI(argv: string[], resourcesPath: string): void {
                 theme: settings.getOptionSetting("theme") ?? "latex",
                 themeManager: themeManager,
                 debug: settings.hasOption("debug"),
+                offline: settings.hasOption("offline")
             });
             break;
         }
@@ -171,7 +198,15 @@ export function runCLI(argv: string[], resourcesPath: string): void {
         case "help":
             printHelpMessage(cliSchema);
             break;
+        case "clear-cache":
+            clearCache();
+            console.log(chalk.green("Cache cleared"));
+            break;
     }
+}
+
+function clearCache(): void {
+    FsUtil.remove(resolveResourcePath("_cache"));
 }
 
 function listThemes(themeManager: ThemeManager): void {
@@ -185,7 +220,10 @@ function listThemes(themeManager: ThemeManager): void {
         let theme = themeManager.loadThemeManifest(name);
 
         output.writeln(indent + chalk.bold(chalk.cyanBright(name)), "-", theme.displayName);
-        output.writeln(indent + chalk.dim("description:            "), chalk.italic(theme.description));
+        output.writeln(
+            indent + chalk.dim("description:            "),
+            chalk.italic(theme.description)
+        );
         output.writeln(indent + chalk.dim("author:                 "), theme.author);
         output.writeln(
             indent + chalk.dim("includes custom assets: "),
@@ -226,13 +264,14 @@ function displaySyntaxError(error: NexSyntaxError): void {
     process.stderr.write(output.read());
 }
 
-function build(args: {
+async function build(args: {
     inputFile: string;
     outputFile: string;
     theme: string;
     themeManager: ThemeManager;
     debug: boolean;
-}): void {
+    offline: boolean;
+}): Promise<void> {
     if (!FsUtil.exists(args.inputFile)) {
         panic("No such file or directory");
     }
@@ -243,10 +282,12 @@ function build(args: {
     try {
         let document = parser.parse();
 
-        generator.generateStandaloneHTML(
-            document,
-            args.outputFile,
-            args.themeManager.loadTheme(args.theme)
+        await generator.generateStandaloneHTML({
+            document: document,
+            path: args.outputFile,
+            themeData: args.themeManager.loadTheme(args.theme),
+            offline: args.offline
+        }
         );
     } catch (e) {
         if (e instanceof NexSyntaxError) {

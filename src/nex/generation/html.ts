@@ -12,6 +12,7 @@ import {
 } from "../parser/ast";
 import { ThemeData } from "../theme";
 import { FsUtil } from "../util";
+import { DependencyManager } from "./dependency";
 
 const POSTPROC_SCRIPT = `
 for (let element of document.querySelectorAll(".inline-math")) {
@@ -214,22 +215,38 @@ export class HTMLBuilder {
      * Convert the provided document to a standalone HTML
      * and write its contents to `path`.
      */
-    generateStandaloneHTML(document: Document, path: string, themeData: ThemeData): void {
-        let stylesheetElement = `<style>${themeData.getPackedCSS()}</style>`;
-        let katexStyleElement = `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.css" crossorigin="anonymous">`;
-        let katexSrcElement = `<script src="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.js" integrity="sha384-X/XCfMm41VSsqRNQgDerQczD69XqmjOOOwYQvr/uuC+j4OPoNhVgjdGFwhvN02Ja" crossorigin="anonymous"></script>`;
-        let desmosSrcElement = `<script src="https://www.desmos.com/api/v1.7/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6"></script>`;
+    async generateStandaloneHTML(args: {
+        document: Document;
+        path: string;
+        themeData: ThemeData;
+        offline: boolean;
+    }): Promise<void> {
+        let dependencies = new DependencyManager();
+        dependencies.addStylesheetDependency("katex.style", {
+            url: "https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.css",
+        });
+        dependencies.addScriptDependency("katex.script", {
+            url: "https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.js",
+        });
+        dependencies.addScriptDependency("desmos.script", {
+            url: "https://www.desmos.com/api/v1.7/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6",
+        });
+
+        let stylesheetElement = `<style>${args.themeData.getPackedCSS()}</style>`;
+
+        // If the --offline flag is passed, dependency URLs should not be preserved, instead
+        // the data at that URL should be included directly into the output document
+        let preserveDependencyURLs = !args.offline;
+        let embeddings = (await dependencies.generateAllDependencyEmbeddings(preserveDependencyURLs)).join("\n");
 
         let htmlRoot = makeElement("html", {}, [
-            new HTMLVerbatim(
-                `<head>${katexStyleElement}${katexSrcElement}${stylesheetElement}${desmosSrcElement}</head>`
-            ),
+            new HTMLVerbatim(`<head>${embeddings}\n${stylesheetElement}</head>`),
             makeElement("body", {}, [
-                this.generateContentsAsHTML(document),
+                this.generateContentsAsHTML(args.document),
                 new HTMLVerbatim(`<script>${POSTPROC_SCRIPT}</script>`),
             ]),
         ]);
 
-        FsUtil.write(path, "<!DOCTYPE html>\n" + htmlRoot.asHTML());
+        FsUtil.write(args.path, "<!DOCTYPE html>\n" + htmlRoot.asHTML());
     }
 }

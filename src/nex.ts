@@ -1,4 +1,6 @@
 import { runCLI } from "./nex/cli";
+import { setResourcesDirectory } from "./nex/resources";
 import { FsUtil } from "./nex/util";
 
-runCLI(process.argv, FsUtil.joinPath(__dirname, "../resources"));
+setResourcesDirectory(FsUtil.joinPath(__dirname, "../resources"));
+runCLI(process.argv);

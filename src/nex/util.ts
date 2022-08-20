@@ -1,6 +1,11 @@
 import fs from "fs";
 import mime from "mime-types";
 import { join, parse, resolve } from "path";
+import crypto from "crypto";
+
+export function md5Hash(data: string | Buffer): string {
+    return crypto.createHash("md5").update(data).digest("hex");
+}
 
 type Printable = string | number | boolean | undefined | null;
 
