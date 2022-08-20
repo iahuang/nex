@@ -23,7 +23,8 @@ const MODE_NEX_MATH = new LexingMode(
         TokenType.NMExponent,
         TokenType.NMSubscript,
         TokenType.NMParenLeft,
-        TokenType.NMCharacter,
+        TokenType.NMAlphanumeric,
+        TokenType.NMQuotationMark,
     ],
     {
         skipWhitespace: true,
@@ -36,19 +37,42 @@ const MODE_NEX_MATH_CHARACTER = new LexingMode(
         TokenType.NMExponent,
         TokenType.NMSubscript,
         TokenType.NMParenLeft,
-        TokenType.NMCharacter,
+        TokenType.NMAlphanumeric,
         TokenType.NMKeyword,
+        TokenType.NMQuotationMark,
     ],
     {
         skipWhitespace: true,
     }
 );
 
+const MODE_NEX_TEXT_ENV = new LexingMode([TokenType.NMQuotationMark, TokenType.NMTextCharacter], {
+    skipWhitespace: false,
+});
+
 /**
  * A generic math object that can be written as a LaTeX expression.
  */
 export abstract class MathNode {
     abstract asLatex(): string;
+}
+
+/**
+ * Given an unsafe text string (a string to be enclosed in a `\text{}` environment),
+ * escape special characters such as `_` and `$`.
+ */
+function latexTextEscape(unsafeText: string): string {
+    return unsafeText
+        .replaceAll("&", "\\&")
+        .replaceAll("%", "\\%")
+        .replaceAll("$", "\\$")
+        .replaceAll("#", "\\#")
+        .replaceAll("_", "\\_")
+        .replaceAll("{", "\\{")
+        .replaceAll("}", "\\}")
+        .replaceAll("~", "\\~")
+        .replaceAll("^", "\\^")
+        .replaceAll("\\", "\\\\");
 }
 
 /**
@@ -76,7 +100,7 @@ export class Text extends MathNode {
     }
 
     asLatex(): string {
-        return `\\text{${this.content}}`;
+        return `\\text{${latexTextEscape(this.content)}}`;
     }
 }
 
@@ -261,11 +285,33 @@ export class NexMathParser extends ParserBase {
 
             // console.log("PC",token,token.tokenTypeName(),"\n");
 
-            if (token.type === TokenType.NMCharacter) {
+            if (token.type === TokenType.NMAlphanumeric) {
                 content += token.content;
                 this.tokenStream.consumeToken(token);
             } else {
                 return new VerbatimLatex(content);
+            }
+        }
+    }
+
+    private _parseText(): Text {
+        let text = "";
+
+        while (true) {
+            let token = this.tokenStream.nextToken(MODE_NEX_TEXT_ENV);
+
+            if (!token) {
+                this.unexpectedTokenError();
+            }
+
+            switch (token.type) {
+                case TokenType.NMQuotationMark:
+                    return new Text(text);
+                case TokenType.NMTextCharacter:
+                    text += token.content;
+                    break;
+                default:
+                    this.debug_unhandledTokenError(token);
             }
         }
     }
@@ -332,7 +378,7 @@ export class NexMathParser extends ParserBase {
                         return new VerbatimLatex(keyword.latexTemplate);
                     }
                 }
-                case TokenType.NMCharacter:
+                case TokenType.NMAlphanumeric:
                     return this._parseCharacters(token.content);
                 case TokenType.NMParenLeft:
                     return new Bracketed(
@@ -375,6 +421,8 @@ export class NexMathParser extends ParserBase {
 
                     return new Subscript(previousNode, stripParentheses(exponent));
                 }
+                case TokenType.NMQuotationMark:
+                    return this._parseText();
                 default:
                     this.debug_unhandledTokenError(token);
             }

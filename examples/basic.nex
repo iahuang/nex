@@ -43,7 +43,7 @@ this condition. This is written using the following definition of limit
     We say that the limit as !x approaches !a equals !L, written $lim(x->a)=L$, when
 
     ${
-        forall epsilon > 0, exists delta > 0 s.t. 0<abs(x-a)<delta implies abs(f(x)-L)<epsilon
+        forall epsilon > 0, exists delta > 0" s.t. "0<abs(x-a)<delta implies abs(f(x)-L)<epsilon
     }
 }
 

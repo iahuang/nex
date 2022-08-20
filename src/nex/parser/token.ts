@@ -143,7 +143,12 @@ export enum TokenType {
     NMArgumentSeparator,
 
     // TextCharacter, but for NeX math contexts
-    NMCharacter,
+    NMAlphanumeric,
+
+    // '"'
+    NMQuotationMark,
+
+    NMTextCharacter,
 }
 
 export class Token {

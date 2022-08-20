@@ -256,9 +256,11 @@ export class TokenMatcher {
                 .addTokenPattern(TokenType.NMCurlyLeft, { string: "{" })
                 .addTokenPattern(TokenType.NMCurlyRight, { string: "}" })
                 .addTokenPattern(TokenType.NMArgumentSeparator, { string: "," })
-                .addTokenPattern(TokenType.NMCharacter, { regex: /^[a-zA-Z\\.0-9]/g })
+                .addTokenPattern(TokenType.NMAlphanumeric, { regex: /^[a-zA-Z\\.0-9]/g })
                 .addTokenPattern(TokenType.NexMathBlockStart, { string: "${" })
                 .addTokenPattern(TokenType.NexMathBlockEnd, { string: "}" })
+                .addTokenPattern(TokenType.NMQuotationMark, { string: '"' })
+                .addTokenPattern(TokenType.NMTextCharacter, { regex: /^./g })
         );
     }
 }
