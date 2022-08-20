@@ -125,7 +125,7 @@ export class Parser extends ParserBase {
         // | }
         this.expectToken(TokenType.BlockBegin, {
             skipWhitespace: true,
-            allowNewlines: true,
+            skipNewlines: true,
         });
 
         let blockName = blockNameToken.content;

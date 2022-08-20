@@ -6,7 +6,7 @@ import { NexMathKeywords } from "./nex_math/keywords";
 
 export interface LexingModeOptions {
     skipWhitespace: boolean;
-    allowNewlines?: boolean;
+    skipNewlines?: boolean;
 }
 
 export class LexingMode {
@@ -261,6 +261,7 @@ export class TokenMatcher {
                 .addTokenPattern(TokenType.NexMathBlockEnd, { string: "}" })
                 .addTokenPattern(TokenType.NMQuotationMark, { string: '"' })
                 .addTokenPattern(TokenType.NMTextCharacter, { regex: /^./g })
+                .addTokenPattern(TokenType.NMMatrixDecl, { string: "mat(" })
         );
     }
 }
@@ -433,7 +434,7 @@ export class TokenStream {
 
         // Otherwise remove whitespace and try again
         if (mode.options.skipWhitespace) {
-            this.consumeWhitespace(Boolean(mode.options.allowNewlines));
+            this.consumeWhitespace(Boolean(mode.options.skipNewlines));
 
             match = this.tokenMatcher.matchToken(this.getRemainingContent(), mode.validTokenTypes);
             if (match) {

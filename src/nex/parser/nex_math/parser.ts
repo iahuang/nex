@@ -18,6 +18,7 @@ import { NexMathKeywords } from "./keywords";
 
 const MODE_NEX_MATH = new LexingMode(
     [
+        TokenType.NMMatrixDecl,
         TokenType.NMKeyword,
         TokenType.NMFrac,
         TokenType.NMExponent,
@@ -33,6 +34,7 @@ const MODE_NEX_MATH = new LexingMode(
 
 const MODE_NEX_MATH_CHARACTER = new LexingMode(
     [
+        TokenType.NMMatrixDecl,
         TokenType.NMFrac,
         TokenType.NMExponent,
         TokenType.NMSubscript,
@@ -49,6 +51,13 @@ const MODE_NEX_MATH_CHARACTER = new LexingMode(
 const MODE_NEX_TEXT_ENV = new LexingMode([TokenType.NMQuotationMark, TokenType.NMTextCharacter], {
     skipWhitespace: false,
 });
+
+const MODE_NEX_MATH_MATRIX = new LexingMode(
+    [TokenType.NMBracketLeft, TokenType.NMParenRight, TokenType.EOL],
+    {
+        skipWhitespace: true,
+    }
+);
 
 /**
  * A generic math object that can be written as a LaTeX expression.
@@ -218,6 +227,23 @@ export class LatexTemplate extends MathNode {
     }
 }
 
+export class Matrix extends MathNode {
+    rows: MathNode[][];
+
+    constructor(rows: MathNode[][]) {
+        super();
+        this.rows = rows;
+    }
+
+    asLatex(): string {
+        let content = this.rows
+            .map((row) => row.map((cell) => cell.asLatex()).join(" & "))
+            .join("\\\\");
+
+        return `\\begin{bmatrix}${content}\\end{bmatrix}`;
+    }
+}
+
 enum BracketType {
     Parentheses,
     Square,
@@ -294,6 +320,9 @@ export class NexMathParser extends ParserBase {
         }
     }
 
+    /**
+     * Similar to `unexpectedTokenError`, but with a clearer, NeX math focused error message
+     */
     private _unsupportedCharacterError(): never {
         this.tokenStream.consumeWhitespace(false);
         let offendingChracter = this.tokenStream.getRemainingContent()[0];
@@ -302,6 +331,56 @@ export class NexMathParser extends ParserBase {
                 offendingChracter
             )} is invalid in NeX math`
         );
+    }
+
+    private _parseMatrixRow(): MathNode[] {
+        let row: MathNode[] = [];
+
+        while (true) {
+            let nextCell = this._parseExpression([
+                TokenType.NMBracketRight,
+                TokenType.NMArgumentSeparator,
+            ]);
+
+            row.push(nextCell.expression);
+
+            // Check whether we encountered a "]", indicating
+            // the end of the passed row cells
+            if (nextCell.stoppedOn.type === TokenType.NMBracketRight) {
+                break;
+            }
+        }
+
+        return row;
+    }
+
+    private _parseMatrix(): Matrix {
+        let rows: MathNode[][] = [];
+
+        while (true) {
+            let token = this.tokenStream.nextToken(MODE_NEX_MATH_MATRIX);
+
+            if (!token) {
+                this.unexpectedTokenError();
+            }
+
+            if (token.type === TokenType.NMBracketLeft) {
+                let newRow = this._parseMatrixRow();
+
+                // validate that this row is the same length as all previous rows
+                for (let existingRow of rows) {
+                    if (newRow.length !== existingRow.length) {
+                        this.throwSyntaxError(
+                            `All matrix rows must have the same size; incompatible new row of length ${newRow.length} with existing row(s) of length ${existingRow.length}`,
+                            token
+                        );
+                    }
+                }
+                rows.push(newRow);
+            } else if (token.type === TokenType.NMParenRight) {
+                return new Matrix(rows);
+            }
+        }
     }
 
     private _parseText(): Text {
@@ -433,6 +512,8 @@ export class NexMathParser extends ParserBase {
                 }
                 case TokenType.NMQuotationMark:
                     return this._parseText();
+                case TokenType.NMMatrixDecl:
+                    return this._parseMatrix();
                 default:
                     this.debug_unhandledTokenError(token);
             }

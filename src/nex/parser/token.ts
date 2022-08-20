@@ -149,6 +149,9 @@ export enum TokenType {
     NMQuotationMark,
 
     NMTextCharacter,
+
+    // "mat("
+    NMMatrixDecl
 }
 
 export class Token {

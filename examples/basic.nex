@@ -50,3 +50,7 @@ this condition. This is written using the following definition of limit
 #desmos {
     :equation $e^(x+1)$
 }
+
+${
+    M = mat([A, B, C][D, E, F][G, H, I])
+}
