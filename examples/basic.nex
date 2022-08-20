@@ -52,5 +52,5 @@ this condition. This is written using the following definition of limit
 }
 
 ${
-    M = mat([A, B, C][D, E, F][G, H, I])
+    M = mat([1,2,3][4,5,6][7,8,9])
 }

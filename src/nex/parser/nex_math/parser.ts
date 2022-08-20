@@ -333,8 +333,8 @@ export class NexMathParser extends ParserBase {
         );
     }
 
-    private _parseMatrixRow(): MathNode[] {
-        let row: MathNode[] = [];
+    private _parseMatrixRow(): Expression[] {
+        let row: Expression[] = [];
 
         while (true) {
             let nextCell = this._parseExpression([
@@ -355,7 +355,7 @@ export class NexMathParser extends ParserBase {
     }
 
     private _parseMatrix(): Matrix {
-        let rows: MathNode[][] = [];
+        let rows: Expression[][] = [];
 
         while (true) {
             let token = this.tokenStream.nextToken(MODE_NEX_MATH_MATRIX);
@@ -366,6 +366,11 @@ export class NexMathParser extends ParserBase {
 
             if (token.type === TokenType.NMBracketLeft) {
                 let newRow = this._parseMatrixRow();
+
+                // validate that this row has at least one element
+                if (newRow.length === 1 && newRow[0].children.length === 0) {
+                    this.throwSyntaxError(`Cannot create empty matrix row`, token);
+                }
 
                 // validate that this row is the same length as all previous rows
                 for (let existingRow of rows) {
@@ -378,6 +383,11 @@ export class NexMathParser extends ParserBase {
                 }
                 rows.push(newRow);
             } else if (token.type === TokenType.NMParenRight) {
+                // validate that this matrix has at least one row
+                if (rows.length === 0) {
+                    this.throwSyntaxError(`Cannot create empty matrix`, token);
+                }
+
                 return new Matrix(rows);
             }
         }
