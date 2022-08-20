@@ -150,7 +150,6 @@ export class NexMathKeywords {
                 .addKeyword(",", ",\\,")
                 .addKeyword("$", "\\$")
                 .addKeyword("!", "!")
-                .addKeyword("\\", "\\\\")
                 .addKeyword("carat", "\\^")
                 .addKeyword("*", "\\cdot")
                 .addKeyword("cross", "\\times")

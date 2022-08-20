@@ -25,7 +25,9 @@ function _makeColoredOptionString(option: Option): string {
     if (option.requiresArgument) {
         return (
             `${chalk.magentaBright(first)}` +
-            chalk.italic(chalk.dim(chalk.magentaBright(` [${option.argumentDescription ?? "value"}]`)))
+            chalk.italic(
+                chalk.dim(chalk.magentaBright(` [${option.argumentDescription ?? "value"}]`))
+            )
         );
     }
 
@@ -188,7 +190,7 @@ export function runCLI(argv: string[]): void {
                 theme: settings.getOptionSetting("theme") ?? "latex",
                 themeManager: themeManager,
                 debug: settings.hasOption("debug"),
-                offline: settings.hasOption("offline")
+                offline: settings.hasOption("offline"),
             });
             break;
         }
@@ -235,6 +237,37 @@ function listThemes(themeManager: ThemeManager): void {
     process.stdout.write(output.read());
 }
 
+function displaySourcePreview(
+    source: SourceReference,
+    line: number,
+    lookback: number
+): {
+    output: string;
+    marginWidth: number;
+} {
+    let output = new StringBuffer();
+    let lines = source.getContent().split("\n");
+    let lineNumberMaxWidth = line.toString().length;
+
+    for (let lineNumber = Math.max(0, line - lookback); lineNumber <= line; lineNumber++) {
+        let lineContent = lines[lineNumber - 1];
+        output.write(
+            chalk.dim(
+                chalk.bold(
+                    " ".repeat(lineNumberMaxWidth - lineNumber.toString().length) + lineNumber
+                )
+            )
+        );
+        output.write(chalk.dim("| "));
+        output.writeln(lineContent);
+    }
+
+    return {
+        output: output.read(),
+        marginWidth: lineNumberMaxWidth + 2,
+    };
+}
+
 function displaySyntaxError(error: NexSyntaxError): void {
     let output = new StringBuffer();
 
@@ -249,17 +282,11 @@ function displaySyntaxError(error: NexSyntaxError): void {
         )
     );
     output.writeln(chalk.bold(chalk.redBright("error:"), error.message));
-    if (error.location.line > 1) {
-        // subtract 1, since source location lines start at 1.
-        let offendingLine = error.location.source.getContent().split("\n")[error.location.line - 2];
-
-        output.writeln(chalk.dim(" | ") + offendingLine);
-    }
-    // subtract 1, since source location lines start at 1.
-    let offendingLine = error.location.source.getContent().split("\n")[error.location.line - 1];
-
-    output.writeln(chalk.dim(" | ") + offendingLine);
-    output.writeln(chalk.redBright("   " + " ".repeat(error.location.col - 1) + "^"));
+    let sourcePreview = displaySourcePreview(error.location.source, error.location.line, 4);
+    output.write(sourcePreview.output);
+    output.writeln(
+        chalk.redBright(" ".repeat(error.location.col - 1 + sourcePreview.marginWidth) + "^")
+    );
 
     process.stderr.write(output.read());
 }
@@ -286,9 +313,8 @@ async function build(args: {
             document: document,
             path: args.outputFile,
             themeData: args.themeManager.loadTheme(args.theme),
-            offline: args.offline
-        }
-        );
+            offline: args.offline,
+        });
     } catch (e) {
         if (e instanceof NexSyntaxError) {
             displaySyntaxError(e);

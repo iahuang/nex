@@ -12,7 +12,7 @@
 
 import { LexingMode, TokenStream } from "../lexer";
 import { Token, TokenType } from "../token";
-import { NexSyntaxError } from "../errors";
+import { NexSyntaxError, userFriendlyCharacterRepresentation } from "../errors";
 import { ParserBase } from "../parser_base";
 import { NexMathKeywords } from "./keywords";
 
@@ -294,6 +294,16 @@ export class NexMathParser extends ParserBase {
         }
     }
 
+    private _unsupportedCharacterError(): never {
+        this.tokenStream.consumeWhitespace(false);
+        let offendingChracter = this.tokenStream.getRemainingContent()[0];
+        this.throwSyntaxError(
+            `Character ${userFriendlyCharacterRepresentation(
+                offendingChracter
+            )} is invalid in NeX math`
+        );
+    }
+
     private _parseText(): Text {
         let text = "";
 
@@ -301,7 +311,7 @@ export class NexMathParser extends ParserBase {
             let token = this.tokenStream.nextToken(MODE_NEX_TEXT_ENV);
 
             if (!token) {
-                this.unexpectedTokenError();
+                this._unsupportedCharacterError();
             }
 
             switch (token.type) {
@@ -321,7 +331,7 @@ export class NexMathParser extends ParserBase {
             let token = this.tokenStream.nextToken(MODE_NEX_MATH);
 
             if (!token) {
-                this.unexpectedTokenError();
+                this._unsupportedCharacterError();
             }
 
             switch (token.type) {
