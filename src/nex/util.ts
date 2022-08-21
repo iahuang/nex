@@ -264,3 +264,7 @@ export namespace FsUtil {
         }
     }
 }
+
+export function createDataURL(data: Buffer, mimeType: string): string {
+    return "data:" + mimeType + ";base64," + data.toString("base64");
+}

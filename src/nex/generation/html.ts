@@ -1,3 +1,4 @@
+import { ScriptDependency, StylesheetDependency } from "../dependency";
 import {
     BlockMath,
     Callout,
@@ -12,7 +13,6 @@ import {
 } from "../parser/ast";
 import { ThemeData } from "../theme";
 import { FsUtil } from "../util";
-import { DependencyManager } from "./dependency";
 
 const POSTPROC_SCRIPT = `
 for (let element of document.querySelectorAll(".inline-math")) {
@@ -221,14 +221,42 @@ export class HTMLBuilder {
         themeData: ThemeData;
         offline: boolean;
     }): Promise<void> {
-        let dependencies = new DependencyManager();
-        dependencies.addStylesheetDependency("katex.style", {
+        let katexFontFiles = [
+            "fonts/KaTeX_AMS-Regular.woff2",
+            "fonts/KaTeX_Caligraphic-Bold.woff2",
+            "fonts/KaTeX_Caligraphic-Regular.woff2",
+            "fonts/KaTeX_Fraktur-Bold.woff2",
+            "fonts/KaTeX_Fraktur-Regular.woff2",
+            "fonts/KaTeX_Main-Bold.woff2",
+            "fonts/KaTeX_Main-BoldItalic.woff2",
+            "fonts/KaTeX_Main-Italic.woff2",
+            "fonts/KaTeX_Main-Regular.woff2",
+            "fonts/KaTeX_Math-BoldItalic.woff2",
+            "fonts/KaTeX_Math-Italic.woff2",
+            "fonts/KaTeX_SansSerif-Bold.woff2",
+            "fonts/KaTeX_SansSerif-Italic.woff2",
+            "fonts/KaTeX_SansSerif-Regular.woff2",
+            "fonts/KaTeX_Script-Regular.woff2",
+            "fonts/KaTeX_Size1-Regular.woff2",
+            "fonts/KaTeX_Size2-Regular.woff2",
+            "fonts/KaTeX_Size3-Regular.woff2",
+            "fonts/KaTeX_Size4-Regular.woff2",
+            "fonts/KaTeX_Typewriter-Regular.woff2",
+        ];
+        let katexStylesheet = new StylesheetDependency({
             url: "https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.css",
         });
-        dependencies.addScriptDependency("katex.script", {
+
+        for (let fontFile of katexFontFiles) {
+            katexStylesheet.addExternalFontDependency(fontFile, {
+                url: "https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/" + fontFile,
+            });
+        }
+
+        let katexJS = new ScriptDependency({
             url: "https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.js",
         });
-        dependencies.addScriptDependency("desmos.script", {
+        let desmosJS = new ScriptDependency({
             url: "https://www.desmos.com/api/v1.7/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6",
         });
 
@@ -237,10 +265,11 @@ export class HTMLBuilder {
         // If the --offline flag is passed, dependency URLs should not be preserved, instead
         // the data at that URL should be included directly into the output document
         let preserveDependencyURLs = !args.offline;
-        let embeddings = (await dependencies.generateAllDependencyEmbeddings(preserveDependencyURLs)).join("\n");
 
         let htmlRoot = makeElement("html", {}, [
-            new HTMLVerbatim(`<head>${embeddings}\n${stylesheetElement}</head>`),
+            new HTMLVerbatim(
+                `<head>${await katexStylesheet.generateEmbedding()}\n${await katexJS.generateEmbedding()}\n${await desmosJS.generateEmbedding()}\n${stylesheetElement}</head>`
+            ),
             makeElement("body", {}, [
                 this.generateContentsAsHTML(args.document),
                 new HTMLVerbatim(`<script>${POSTPROC_SCRIPT}</script>`),

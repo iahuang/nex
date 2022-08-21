@@ -132,14 +132,7 @@ export function runCLI(argv: string[]): void {
                         description: "Output additional information for debug purposes",
                         requiresArgument: false,
                         allowDuplicates: false,
-                    },
-                    {
-                        name: "offline",
-                        description:
-                            "Download and bundle external dependencies (e.g. KaTeX) so that the generated HTML file can be viewed offline.\nThis may substantially increase the size of the outputted HTML file.",
-                        requiresArgument: false,
-                        allowDuplicates: false,
-                    },
+                    }
                 ],
             },
             {
