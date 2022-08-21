@@ -19,17 +19,14 @@ To see examples of NeX syntax, see the `examples/` folder.
 ### Currently Implemented
 - **Based off Markdown**: NeX aims to largely exist as a superset of Markdown, a common markup syntax. Many syntax rules such as using
 astrisks (`*`) for italics and double astrisks (`**`) for bold face should feel familiar (**partially implemented**).
-
 - **Custom math syntax**: NeX uses a custom LaTeX-based syntax for writing math that is designed to feel more intuitive, faster to write, and easier to read,
 yet still retain the same flexibility as LaTeX.
-
 - **Desmos integration**: NeX makes use of the Desmos API to allow you to embed Desmos graphs directly into your documents.
-
 - **Theme support**: NeX includes several themes to customize the look of your documents. You can also easily create your own themes using plain CSS.
+- **Dependency bundling**: NeX generates standalone HTML files that have all relevant assets, dependencies, and media bundled with the HTML file itself so that it can be shared by itself and viewed on any device, even without an internet connection.
 
 ### Planned for Initial Release
 - **Syntax highlighting**: Include code blocks with automatic syntax highlighting
-- **Offline documents**: NeX can generate standalone HTML documents that can be viewed without Internet access; external media such as images will be automatically bundled with the HTML file.
 - **Visual Studio Code Integration**: NeX has a VS Code extension to enable autocomplete, syntax highlighting, and more.
 - **Pages**: NeX can generate nested document structures into a single HTML file that provides built-in navigation between pages and the ability to search all pages at once.
 - **Live editing**: NeX will display the rendered contents of a NeX document inside of a webpage that automatically hot-reloads to reflect changes without manually having to rebuild an HTML file.

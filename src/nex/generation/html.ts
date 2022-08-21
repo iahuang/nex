@@ -262,10 +262,6 @@ export class HTMLBuilder {
 
         let stylesheetElement = `<style>${args.themeData.getPackedCSS()}</style>`;
 
-        // If the --offline flag is passed, dependency URLs should not be preserved, instead
-        // the data at that URL should be included directly into the output document
-        let preserveDependencyURLs = !args.offline;
-
         let htmlRoot = makeElement("html", {}, [
             new HTMLVerbatim(
                 `<head>${await katexStylesheet.generateEmbedding()}\n${await katexJS.generateEmbedding()}\n${await desmosJS.generateEmbedding()}\n${stylesheetElement}</head>`
