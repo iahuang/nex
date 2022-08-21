@@ -8,7 +8,7 @@ then terminates.
 
 ## Example implementation in C
 ```c
-include <stdio.h>
+#include <stdio.h>
 
 int main(char* argv) {
     printf("Hello, World!");
