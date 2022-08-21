@@ -24,9 +24,9 @@ yet still retain the same flexibility as LaTeX.
 - **Desmos integration**: NeX makes use of the Desmos API to allow you to embed Desmos graphs directly into your documents.
 - **Theme support**: NeX includes several themes to customize the look of your documents. You can also easily create your own themes using plain CSS.
 - **Dependency bundling**: NeX generates standalone HTML files that have all relevant assets, dependencies, and media bundled with the HTML file itself so that it can be shared by itself and viewed on any device, even without an internet connection.
+- **Syntax highlighting**: Include code blocks using Markdown-style syntax that are automatically highlighted according to the specified language.
 
 ### Planned for Initial Release
-- **Syntax highlighting**: Include code blocks with automatic syntax highlighting
 - **Visual Studio Code Integration**: NeX has a VS Code extension to enable autocomplete, syntax highlighting, and more.
 - **NeX Notebooks**: NeX can generate nested document structures into a single HTML file that provides built-in navigation between pages and the ability to search all pages at once.
 - **Live editing**: NeX will display the rendered contents of a NeX document inside of a webpage that automatically hot-reloads to reflect changes without manually having to rebuild an HTML file.
