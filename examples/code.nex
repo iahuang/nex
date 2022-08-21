@@ -1,0 +1,17 @@
+:title Demonstration of Syntax Highlighting
+
+# Hello, World!
+"Hello, world!" refers to a class of computer program generally used as a minimum working example
+of a computer programming language. The behavior of the "Hello, world!" program is largely
+the same across implementations; the string "Hello, world!" is written to stdout, and the program
+then terminates.
+
+## Example implementation in C
+```c
+include <stdio.h>
+
+int main(char* argv) {
+    printf("Hello, World!");
+    return 0;
+}
+```

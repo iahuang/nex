@@ -32,6 +32,8 @@ for (let element of document.querySelectorAll(".calculator")) {
     let calculator = Desmos.GraphingCalculator(element, {expressions: false});
     calculator.setExpression({id: "graph1", latex: element.dataset.equation});
 }
+
+hljs.highlightAll();
 `;
 
 function escape(htmlStr: string): string {
@@ -260,11 +262,19 @@ export class HTMLBuilder {
             url: "https://www.desmos.com/api/v1.7/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6",
         });
 
+        let highlightJSStylesheet = new StylesheetDependency({
+            url: "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.6.0/styles/default.min.css",
+        });
+
+        let highlightJS = new ScriptDependency({
+            url: "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.6.0/highlight.min.js",
+        });
+
         let stylesheetElement = `<style>${args.themeData.getPackedCSS()}</style>`;
 
         let htmlRoot = makeElement("html", {}, [
             new HTMLVerbatim(
-                `<head>${await katexStylesheet.generateEmbedding()}\n${await katexJS.generateEmbedding()}\n${await desmosJS.generateEmbedding()}\n${stylesheetElement}</head>`
+                `<head>${await katexStylesheet.generateEmbedding()}\n${await katexJS.generateEmbedding()}\n${await desmosJS.generateEmbedding()}\n${await highlightJSStylesheet.generateEmbedding()}\n${await highlightJS.generateEmbedding()}${stylesheetElement}</head>`
             ),
             makeElement("body", {}, [
                 this.generateContentsAsHTML(args.document),

@@ -204,7 +204,7 @@ export class TokenMatcher {
                 .addTokenPattern(TokenType.BlockMathModeEnd, { string: "$$" })
                 .addTokenPattern(TokenType.InlineMathModeBegin, { string: "$" })
                 .addTokenPattern(TokenType.InlineMathModeEnd, { string: "$" })
-                .addTokenPattern(TokenType.EOL, { regex: /^\n/g })
+                .addTokenPattern(TokenType.EOL, { string: "\n" })
                 .addTokenPattern(TokenType.EOF, {
                     matcher: (content) => (content.length === 0 ? "" : null),
                 })

@@ -300,6 +300,8 @@ export class Parser extends ParserBase {
     private _parseCodeBlock(language: string | null): CodeBlock {
         let code = "";
 
+        this.expectToken(TokenType.EOL, {skipWhitespace: false});
+
         while (true) {
             let token = this.tokenStream.nextToken(MODE_CODE_BLOCK);
 

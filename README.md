@@ -28,7 +28,7 @@ yet still retain the same flexibility as LaTeX.
 ### Planned for Initial Release
 - **Syntax highlighting**: Include code blocks with automatic syntax highlighting
 - **Visual Studio Code Integration**: NeX has a VS Code extension to enable autocomplete, syntax highlighting, and more.
-- **Pages**: NeX can generate nested document structures into a single HTML file that provides built-in navigation between pages and the ability to search all pages at once.
+- **NeX Notebooks**: NeX can generate nested document structures into a single HTML file that provides built-in navigation between pages and the ability to search all pages at once.
 - **Live editing**: NeX will display the rendered contents of a NeX document inside of a webpage that automatically hot-reloads to reflect changes without manually having to rebuild an HTML file.
 
 ### Planned for Future Releases
