@@ -18,7 +18,7 @@ To see examples of NeX syntax, see the `examples/` folder.
 
 ### Currently Implemented
 - **Based off Markdown**: NeX aims to largely exist as a superset of Markdown, a common markup syntax. Many syntax rules such as using
-astrisks (`*`) for italics and double astrisks (`**`) for bold face should feel familiar (**partially implemented**).
+astrisks (`*`) for italics, using pound prefixes (`##`) for headers, and so on, should feel familiar (**partially implemented**).
 - **Custom math syntax**: NeX uses a custom LaTeX-based syntax for writing math that is designed to feel more intuitive, faster to write, and easier to read,
 yet still retain the same flexibility as LaTeX.
 - **Desmos integration**: NeX makes use of the Desmos API to allow you to embed Desmos graphs directly into your documents.
