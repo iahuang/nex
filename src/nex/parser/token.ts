@@ -61,6 +61,10 @@ export enum TokenType {
     // }
     BlockEnd,
 
+    InlineCodeBegin,
+
+    InlineCodeEnd,
+
     // ```
     CodeBegin,
 

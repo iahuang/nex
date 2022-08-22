@@ -11,6 +11,7 @@ import {
     Document,
     Element,
     Header,
+    InlineCodeBlock,
     InlineMath,
     Paragraph,
     Text,
@@ -61,11 +62,17 @@ const MODE_TOPLEVELCALLOUT = new LexingMode(
     }
 );
 
-const MODE_INLINE = new LexingMode(
+const MODE_INLINE_CODE_BLOCK = new LexingMode(
+    [TokenType.InlineCodeEnd, TokenType.TextCharacter],
+    { skipWhitespace: true }
+);
+
+const MODE_TEXT_INLINE = new LexingMode(
     [
         TokenType.ItalicBegin,
         TokenType.InlineMathModeBegin,
         TokenType.ShorthandInlineMath,
+        TokenType.InlineCodeBegin,
         TokenType.TextCharacter,
         TokenType.EOL,
         TokenType.EOF,
@@ -227,7 +234,7 @@ export class Parser extends ParserBase {
 
         while (true) {
             // Peek the next token
-            let token = this.tokenStream.nextToken(MODE_INLINE, { peek: true });
+            let token = this.tokenStream.nextToken(MODE_TEXT_INLINE, { peek: true });
 
             // if the next token can't be matched (e.g. EOF, let the parent environment handle it)
             if (!token) {
@@ -244,6 +251,10 @@ export class Parser extends ParserBase {
                     paragraph.children.push(new InlineMath(latex));
                     break;
                 }
+                case TokenType.InlineCodeBegin:
+                    this.tokenStream.consumeToken(token);
+                    paragraph.children.push(this._parseInlineCodeBlock());
+                    break;
                 case TokenType.EOL:
                     // consume the token we peeked so we can peek the token after that
                     this.tokenStream.consumeToken(token);
@@ -274,7 +285,7 @@ export class Parser extends ParserBase {
                         // If the next token isn't valid as an inline token, then
                         // we assume that the next token should end the current paragraph
                         // block.
-                        if (!MODE_INLINE.validTokenTypes.includes(nextToken.type)) {
+                        if (!MODE_TEXT_INLINE.validTokenTypes.includes(nextToken.type)) {
                             return paragraph;
                         }
 
@@ -297,10 +308,33 @@ export class Parser extends ParserBase {
         }
     }
 
+    private _parseInlineCodeBlock(): InlineCodeBlock {
+        let code = "";
+
+        while (true) {
+            let token = this.tokenStream.nextToken(MODE_INLINE_CODE_BLOCK);
+
+            if (!token) {
+                this.unexpectedTokenError();
+            }
+
+            switch (token.type) {
+                case TokenType.TextCharacter:
+                    code += token.content;
+                    break;
+                case TokenType.InlineCodeEnd: {
+                    return new InlineCodeBlock(code);
+                }
+                default:
+                    this.debug_unhandledTokenError(token);
+            }
+        }
+    }
+
     private _parseCodeBlock(language: string | null): CodeBlock {
         let code = "";
 
-        this.expectToken(TokenType.EOL, {skipWhitespace: false});
+        this.expectToken(TokenType.EOL, { skipWhitespace: false });
 
         while (true) {
             let token = this.tokenStream.nextToken(MODE_CODE_BLOCK);
@@ -331,7 +365,7 @@ export class Parser extends ParserBase {
 
         while (true) {
             // Peek the next token
-            let token = this.tokenStream.nextToken(MODE_INLINE, { peek: true });
+            let token = this.tokenStream.nextToken(MODE_TEXT_INLINE, { peek: true });
 
             if (!token) {
                 this.unexpectedTokenError();
@@ -367,7 +401,7 @@ export class Parser extends ParserBase {
             //  - EOL
             //
             // we peek this token so we can decide whether to consume it later.
-            let token = this.tokenStream.nextToken(MODE_INLINE, { peek: true });
+            let token = this.tokenStream.nextToken(MODE_TEXT_INLINE, { peek: true });
 
             if (!token) {
                 this.unexpectedTokenError();

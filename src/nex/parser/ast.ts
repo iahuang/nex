@@ -15,9 +15,9 @@ export abstract class ContainerElement extends Element {
 export class Header extends Element {
     /**
      * H1: `depth=1`
-     * 
+     *
      * H2: `depth=2`
-     * 
+     *
      * etc.
      */
     depth: number;
@@ -55,7 +55,6 @@ export class Callout extends ContainerElement {
     }
 }
 
-
 export class CodeBlock extends Element {
     content: string;
     language: string | null;
@@ -67,6 +66,14 @@ export class CodeBlock extends Element {
     }
 }
 
+export class InlineCodeBlock extends Element {
+    content: string;
+
+    constructor(content: string) {
+        super();
+        this.content = content;
+    }
+}
 
 export class BlockMath extends Element {
     content: string;

@@ -7,6 +7,7 @@ import {
     Document,
     Element,
     Header,
+    InlineCodeBlock,
     InlineMath,
     Paragraph,
     Text,
@@ -164,6 +165,8 @@ export class HTMLBuilder {
                 style: "width: 600px; height: 400px;",
             });
             return desmos;
+        } else if (element instanceof InlineCodeBlock) {
+            return makeElement("code", {}, [textNode(element.content)]);
         } else if (element instanceof CodeBlock) {
             let codeBlock = makeElement("code", { class: "language-" + element.language }, [
                 textNode(element.content),

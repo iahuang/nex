@@ -210,6 +210,8 @@ export class TokenMatcher {
                 })
                 .addTokenPattern(TokenType.BlockBegin, { string: "{" })
                 .addTokenPattern(TokenType.BlockEnd, { string: "}" })
+                .addTokenPattern(TokenType.InlineCodeBegin, { string: "`" })
+                .addTokenPattern(TokenType.InlineCodeEnd, { string: "`" })
                 .addTokenPattern(TokenType.CodeBegin, { regex: /^```/g })
                 .addTokenPattern(TokenType.LangCodeBegin, { regex: /^```\w+/g })
                 .addTokenPattern(TokenType.CodeEnd, { string: "```" })
