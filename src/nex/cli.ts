@@ -242,7 +242,7 @@ function displaySourcePreview(
     let lines = source.getContent().split("\n");
     let lineNumberMaxWidth = line.toString().length;
 
-    for (let lineNumber = Math.max(0, line - lookback); lineNumber <= line; lineNumber++) {
+    for (let lineNumber = Math.max(1, line - lookback); lineNumber <= line; lineNumber++) {
         let lineContent = lines[lineNumber - 1];
         output.write(
             chalk.dim(
