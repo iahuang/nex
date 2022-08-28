@@ -1,5 +1,6 @@
 {
     "compilerOptions": {
+        "jsx": "react",
         "target": "ES2015",
         "module": "commonjs",
         "strict": true,
@@ -7,9 +8,10 @@
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "outDir": "build",
-        "lib": ["ESNext"]
+        "lib": ["ESNext"],
+        "jsxFactory": "createElement"
     },
-    "exclude": ["scripts", "build"],
+    "exclude": ["scripts", "build", "testing"],
     "$schema": "https://json.schemastore.org/tsconfig",
     "display": "Recommended"
 }

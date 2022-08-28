@@ -1,4 +1,4 @@
-:title Introduction to Graphs
+:title MAT137 - Lecture 1
 
 ## 2.3 The Formal Definition of Limit
 
@@ -11,7 +11,7 @@ ${
 we should interpret this as "as !x approaches !a, $f(x)$ approaches !L". More specifically, "we can make $f(x)$
 arbitrarily close to !L by making !x arbitrarily close to !a". Recall the earlier definition of using absolute value
 for closeness. The notion of making !x arbitrarily close to !a can be thought of as writing a condition where,
-for some arbitrarily small $delta$,
+for some arbitrarily small !delta,
 
 ${
     abs(x-a) < delta
@@ -35,22 +35,7 @@ Finally, we say that the above statement is true, for an arbitrarily small dista
 for some choice of !epsilon, where $abs(f (x) - L) < epsilon$, we can choose a !epsilon for which all values of $0 < abs(x - a) < delta$ satisfy
 this condition. This is written using the following definition of limit
 
-
-
-#callout {
-    :title Definition
-
-    We say that the limit as !x approaches !a equals !L, written $lim(x->a)=L$, when
-
-    ${
-        forall epsilon > 0, exists delta > 0" s.t. "0<abs(x-a)<delta implies abs(f(x)-L)<epsilon
-    }
-}
-
-#desmos {
-    :equation $e^(x+1)$
-}
-
 ${
-    M = mat([1,2,3][4,5,6][7,8,9])
+    forall epsilon > 0, exists delta > 0" s.t. "0<abs(x-a)<delta implies abs(f(x)-L)<epsilon
 }
+

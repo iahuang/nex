@@ -1,5 +1,5 @@
 export abstract class Element {
-    __ = 1; // here only to prevent `Element` from being seen as an empty type by Typescript
+    abstract elementName: string;
 }
 
 export abstract class ContainerElement extends Element {
@@ -21,9 +21,11 @@ export class Header extends Element {
      * etc.
      */
     depth: number;
-    content: Paragraph;
+    content: Textual[];
 
-    constructor(depth: number, content: Paragraph) {
+    elementName = "header";
+
+    constructor(depth: number, content: Textual[]) {
         super();
 
         this.depth = depth;
@@ -37,6 +39,8 @@ export class Document extends ContainerElement {
      */
     title: string | null;
 
+    elementName = "document";
+
     constructor() {
         super();
         this.title = null;
@@ -49,6 +53,8 @@ export class Callout extends ContainerElement {
      */
     title: string | null;
 
+    elementName = "callout";
+
     constructor() {
         super();
         this.title = null;
@@ -59,6 +65,8 @@ export class CodeBlock extends Element {
     content: string;
     language: string | null;
 
+    elementName = "codeBlock";
+
     constructor(content: string, language: string | null = null) {
         super();
         this.content = content;
@@ -66,25 +74,20 @@ export class CodeBlock extends Element {
     }
 }
 
-export class InlineCodeBlock extends Element {
-    content: string;
-
-    constructor(content: string) {
-        super();
-        this.content = content;
-    }
-}
-
 export class BlockMath extends Element {
     content: string;
 
+    elementName = "blockMath";
+
     constructor(content: string) {
         super();
         this.content = content;
     }
 }
 
-export class Paragraph extends ContainerElement {}
+export class Paragraph extends ContainerElement {
+    elementName = "paragraph";
+}
 
 /**
  * Valid only as a child element of `Paragraph`. Represent some inline text semantic element
@@ -101,25 +104,62 @@ export abstract class Textual extends Element {
 }
 
 export class Text extends Textual {
-    constructor(content: string) {
-        super(content);
-    }
+    elementName = "text";
 }
-
+export class Italic extends Textual {
+    elementName = "italic";
+}
 export class InlineMath extends Textual {
-    constructor(content: string) {
-        super(content);
-    }
+    elementName = "inlineMath";
+}
+export class InlineCode extends Textual {
+    elementName = "inlineCode";
 }
 
 export class DesmosElement extends Element {
     latexEquation: string;
+
+    elementName = "desmos";
 
     constructor(latexExpression: string) {
         super();
 
         this.latexEquation = latexExpression;
     }
+}
+
+export class ListItem {
+    indent: number;
+    content: Element;
+
+    constructor(indent: number, content: Element) {
+        this.indent = indent;
+        this.content = content;
+    }
+}
+
+export class List extends Element {
+    elementName = "list";
+    items: ListItem[];
+    ordering: ListOrdering[];
+    indent: number;
+
+    constructor(items: ListItem[], indent: number, ordering: ListOrdering[]) {
+        super();
+
+        this.items = items;
+        this.ordering = ordering;
+        this.indent = indent;
+    }
+}
+
+export enum ListOrdering {
+    Bulleted = "*",
+    UppercaseLetter = "A",
+    LowercaseLetter = "a",
+    UppercaseRoman = "I",
+    LowercaseRoman = "i",
+    Numbered = "1",
 }
 
 /**
@@ -135,13 +175,13 @@ function _indent(text: string, indent: number): string {
 /**
  * Export a JSON-like representation of an AST element and its children
  */
-export function dump(root: Element): string {
+export function astDump(root: Element): string {
     return _dump(root);
 }
 
 function _dump(element: Element): string {
-    if (element instanceof Text) {
-        return `Text { ${JSON.stringify(element.content)} }`;
+    if (element instanceof Textual) {
+        return `${element.constructor.name} { ${JSON.stringify(element.content)} }`;
     }
 
     if (element instanceof ContainerElement) {
@@ -151,6 +191,17 @@ function _dump(element: Element): string {
             out.push(_indent(_dump(child), 1) + ",");
         }
 
+        out.push("]");
+
+        return out.join("\n");
+    }
+
+    if (element instanceof List) {
+        let out: string[] = ["List ["];
+
+        for (let item of element.items) {
+            out.push(_indent(_dump(item.content), 1) + ",");
+        }
         out.push("]");
 
         return out.join("\n");

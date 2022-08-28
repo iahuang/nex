@@ -1,13 +1,18 @@
 import { SourceLocation } from "../source";
+import { Token } from "./token";
 
 export class NexSyntaxError extends Error {
     location: SourceLocation;
     message: string;
+    note: string | null;
+    offendingToken: Token | null;
 
-    constructor(location: SourceLocation, message: string) {
+    constructor(location: SourceLocation, message: string, offendingToken?: Token, note?: string) {
         super(message);
         this.location = location;
         this.message = message;
+        this.offendingToken = offendingToken ?? null;
+        this.note = note ?? null;
     }
 }
 
@@ -15,22 +20,22 @@ export class NexSyntaxError extends Error {
  * **Example**
  * ```
  * > console.log(userFriendlyCharacterRepresentation("A"));
- * "A"
+ * character "A"
  * > console.log(userFriendlyCharacterRepresentation(" "));
- * [Space]
+ * whitespace
  * > console.log(userFriendlyCharacterRepresentation("\n"));
- * [Newline]
+ * newline
  * ```
  */
 export function userFriendlyCharacterRepresentation(character: string): string {
     switch (character) {
         case " ":
-            return "[Space]";
+            return "whitespace";
         case "\t":
-            return "[Tab]";
+            return "tab";
         case "\n":
-            return "[Newline]";
+            return "newline";
         default:
-            return `"${character}"`;
+            return `character "${character}"`;
     }
 }

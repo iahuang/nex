@@ -1,7 +1,8 @@
 import chalk from "chalk";
 import { CLISchema, Option, parseArgv } from "./argv_parser";
-import { HTMLBuilder } from "./generation/html";
+import { DocumentHTMLGenerator } from "./generation/generation";
 import { panic } from "./logging";
+import { astDump } from "./parser/ast";
 import { NexSyntaxError } from "./parser/errors";
 import { Parser } from "./parser/parser";
 import { resolveResourcePath } from "./resources";
@@ -130,9 +131,10 @@ export function runCLI(argv: string[]): void {
                     {
                         name: "debug",
                         description: "Output additional information for debug purposes",
-                        requiresArgument: false,
+                        argumentDescription: "mode",
+                        requiresArgument: true,
                         allowDuplicates: false,
-                    }
+                    },
                 ],
             },
             {
@@ -182,7 +184,7 @@ export function runCLI(argv: string[]): void {
                 outputFile: settings.getOptionSetting("out") ?? defaultOutputFile,
                 theme: settings.getOptionSetting("theme") ?? "latex",
                 themeManager: themeManager,
-                debug: settings.hasOption("debug"),
+                debugMode: settings.getOptionSetting("debug"),
                 offline: settings.hasOption("offline"),
             });
             break;
@@ -277,9 +279,23 @@ function displaySyntaxError(error: NexSyntaxError): void {
     output.writeln(chalk.bold(chalk.redBright("error:"), error.message));
     let sourcePreview = displaySourcePreview(error.location.source, error.location.line, 4);
     output.write(sourcePreview.output);
-    output.writeln(
-        chalk.redBright(" ".repeat(error.location.col - 1 + sourcePreview.marginWidth) + "^")
-    );
+
+    if (error.offendingToken) {
+        output.writeln(
+            chalk.redBright(
+                " ".repeat(error.location.col - 1 + sourcePreview.marginWidth) +
+                    "~".repeat(error.offendingToken.content.length)
+            )
+        );
+    } else {
+        output.writeln(
+            chalk.redBright(" ".repeat(error.location.col - 1 + sourcePreview.marginWidth) + "^")
+        );
+    }
+
+    if (error.note) {
+        output.writeln(chalk.bold(chalk.yellowBright("note: ")) + error.note);
+    }
 
     process.stderr.write(output.read());
 }
@@ -289,7 +305,7 @@ async function build(args: {
     outputFile: string;
     theme: string;
     themeManager: ThemeManager;
-    debug: boolean;
+    debugMode: string | null;
     offline: boolean;
 }): Promise<void> {
     if (!FsUtil.exists(args.inputFile)) {
@@ -297,22 +313,26 @@ async function build(args: {
     }
 
     let parser = new Parser(SourceReference.fromPath(args.inputFile));
-    let generator = new HTMLBuilder();
+    let generator = new DocumentHTMLGenerator();
 
     try {
         let document = parser.parse();
 
-        await generator.generateStandaloneHTML({
-            document: document,
-            path: args.outputFile,
-            themeData: args.themeManager.loadTheme(args.theme),
-            offline: args.offline,
-        });
+        if (args.debugMode === "ast") {
+            console.log(astDump(document));
+        }
+
+        let html = await generator.generateStandaloneHTML(
+            document,
+            args.themeManager.loadTheme(args.theme)
+        );
+
+        FsUtil.write(args.outputFile, html);
     } catch (e) {
         if (e instanceof NexSyntaxError) {
             displaySyntaxError(e);
 
-            if (args.debug) {
+            if (args.debugMode !== null) {
                 console.error(chalk.dim(chalk.redBright(e.stack)));
             }
 

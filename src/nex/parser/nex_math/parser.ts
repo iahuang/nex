@@ -1,446 +1,108 @@
-/**
- * Parsing extension for NeX math syntax.
- *
- * The NeX math parser and the main NeX syntax parser have been separated
- * for readability.
- *
- * The main NeX parser contains an instance of `NexMathParser` and both
- * share the same `TokenStream` instance. The NeX math parser can therefore
- * be only invoked when needed and can be kept "up-to-date" with the
- * current source location of the main parser.
- */
-
-import { LexingMode, TokenStream } from "../lexer";
 import { Token, TokenType } from "../token";
-import { NexSyntaxError, userFriendlyCharacterRepresentation } from "../errors";
-import { ParserBase } from "../parser_base";
+import { TokenStream } from "../token_stream";
+import { TEXT_CHARACTER, WHITESPACE, WHITESPACE_INCL_NEWLINES } from "../token_types";
+import {
+    Bracketed,
+    BracketType,
+    Case,
+    Cases,
+    Exponent,
+    Expression,
+    Fraction,
+    KeywordNode,
+    MathNode,
+    Matrix,
+    Subscript,
+    MathText,
+    VerbatimLatex,
+} from "./ast";
 import { NexMathKeywords } from "./keywords";
+import {
+    NM_ALPHANUMERIC,
+    NM_ARGUMENT_SEPARATOR,
+    NM_BRACKET_LEFT,
+    NM_BRACKET_RIGHT,
+    NM_CASES_START,
+    NM_CASES_WHEN,
+    NM_CURLY_LEFT,
+    NM_CURLY_RIGHT,
+    NM_EXPONENT,
+    NM_FRAC,
+    NM_KEYWORD,
+    NM_MATRIX_START,
+    NM_PAREN_LEFT,
+    NM_PAREN_RIGHT,
+    NM_SUBSCRIPT,
+    NM_TEXT_END,
+    NM_TEXT_START,
+} from "./token_types";
 
-const MODE_NEX_MATH = new LexingMode(
-    [
-        TokenType.NMMatrixDecl,
-        TokenType.NMKeyword,
-        TokenType.NMFrac,
-        TokenType.NMExponent,
-        TokenType.NMSubscript,
-        TokenType.NMParenLeft,
-        TokenType.NMAlphanumeric,
-        TokenType.NMQuotationMark,
-    ],
-    {
-        skipWhitespace: true,
-    }
-);
-
-const MODE_NEX_MATH_CHARACTER = new LexingMode(
-    [
-        TokenType.NMMatrixDecl,
-        TokenType.NMFrac,
-        TokenType.NMExponent,
-        TokenType.NMSubscript,
-        TokenType.NMParenLeft,
-        TokenType.NMAlphanumeric,
-        TokenType.NMKeyword,
-        TokenType.NMQuotationMark,
-    ],
-    {
-        skipWhitespace: true,
-    }
-);
-
-const MODE_NEX_TEXT_ENV = new LexingMode([TokenType.NMQuotationMark, TokenType.NMTextCharacter], {
-    skipWhitespace: false,
-});
-
-const MODE_NEX_MATH_MATRIX = new LexingMode(
-    [TokenType.NMBracketLeft, TokenType.NMParenRight, TokenType.EOL],
-    {
-        skipWhitespace: true,
-    }
-);
-
-/**
- * A generic math object that can be written as a LaTeX expression.
- */
-export abstract class MathNode {
-    abstract asLatex(): string;
-}
-
-/**
- * Given an unsafe text string (a string to be enclosed in a `\text{}` environment),
- * escape special characters such as `_` and `$`.
- */
-function latexTextEscape(unsafeText: string): string {
-    return unsafeText
-        .replaceAll("&", "\\&")
-        .replaceAll("%", "\\%")
-        .replaceAll("$", "\\$")
-        .replaceAll("#", "\\#")
-        .replaceAll("_", "\\_")
-        .replaceAll("{", "\\{")
-        .replaceAll("}", "\\}")
-        .replaceAll("~", "\\~")
-        .replaceAll("^", "\\^")
-        .replaceAll("\\", "\\\\");
-}
-
-/**
- * A MathNode containing LaTeX code verbatim.
- */
-export class VerbatimLatex extends MathNode {
-    content: string;
-
-    constructor(content: string) {
-        super();
-        this.content = content;
-    }
-
-    asLatex(): string {
-        return this.content;
-    }
-}
-
-export class Text extends MathNode {
-    content: string;
-
-    constructor(content: string) {
-        super();
-        this.content = content;
-    }
-
-    asLatex(): string {
-        return `\\text{${latexTextEscape(this.content)}}`;
-    }
-}
-
-/**
- * A collection of MathNodes.
- *
- * Example: `x + cos y` would be an expression with nodes
- * - `x`
- * - `+`
- * - `cos`
- * - `y`
- */
-export class Expression extends MathNode {
-    children: MathNode[];
-
-    constructor(children: MathNode[]) {
-        super();
-        this.children = children;
-    }
-
-    asLatex(): string {
-        return this.children.map((child) => child.asLatex()).join(" ");
-    }
-}
-
-/**
- * An expression of the form `A/B` where `A` and `B` are MathNodes.
- */
-export class Fraction extends MathNode {
-    numerator: MathNode;
-    denominator: MathNode;
-
-    constructor(numerator: MathNode, denominator: MathNode) {
-        super();
-
-        this.numerator = numerator;
-        this.denominator = denominator;
-    }
-
-    asLatex(): string {
-        return `\\frac{${this.numerator.asLatex()}}{${this.denominator.asLatex()}}`;
-    }
-}
-
-/**
- * An expression of the form `A^B` where `A` and `B` are MathNodes.
- */
-export class Exponent extends MathNode {
-    base: MathNode;
-    exponent: MathNode;
-
-    constructor(base: MathNode, exponent: MathNode) {
-        super();
-
-        this.base = base;
-        this.exponent = exponent;
-    }
-
-    asLatex(): string {
-        return `{${this.base.asLatex()}}^{${this.exponent.asLatex()}}`;
-    }
-}
-
-/**
- * An expression of the form `A_B` where `A` and `B` are MathNodes.
- */
-export class Subscript extends MathNode {
-    base: MathNode;
-    sub: MathNode;
-
-    constructor(base: MathNode, sub: MathNode) {
-        super();
-
-        this.base = base;
-        this.sub = sub;
-    }
-
-    asLatex(): string {
-        return `{${this.base.asLatex()}}_{${this.sub.asLatex()}}`;
-    }
-}
-
-/**
- * A node representing an argumented Latex expression such as
- * `\frac{A}{B}`, `\sum_{A}^{B}`, `\int_{A}^{B}`, where
- * `A` and `B` are MathNodes.
- *
- * `LatexTemplate.template` defines where the arguments should
- * be placed. For instance, the templace `\frac{$0}{$1}` indicates that
- * the first (zeroth) argument should be placed in the numerator of a,
- * LaTeX fraction, and the second argument in the denominator.
- *
- * This type of MathNode is used to represent NeX math functions.
- */
-export class LatexTemplate extends MathNode {
-    children: (MathNode | null)[];
-    template: string;
-
-    constructor(children: (MathNode | null)[], template: string) {
-        super();
-        this.children = children;
-        this.template = template;
-    }
-
-    asLatex(): string {
-        let output = this.template;
-        for (let i = 0; i < this.children.length; i++) {
-            output = output.replaceAll(
-                "$" + i,
-                this.children[i] ? this.children[i]!.asLatex() : ""
-            );
-        }
-
-        return output;
-    }
-}
-
-export class Matrix extends MathNode {
-    rows: MathNode[][];
-
-    constructor(rows: MathNode[][]) {
-        super();
-        this.rows = rows;
-    }
-
-    asLatex(): string {
-        let content = this.rows
-            .map((row) => row.map((cell) => cell.asLatex()).join(" & "))
-            .join("\\\\");
-
-        return `\\begin{bmatrix}${content}\\end{bmatrix}`;
-    }
-}
-
-enum BracketType {
-    Parentheses,
-    Square,
-    Curly,
-}
-
-/**
- * Any MathNode enclosed in brackets such as parentheses, square brackets,
- * or curly brackets. Automatically scales the brackets to fit the contents
- * via `\left` and `\right`.
- */
-export class Bracketed extends MathNode {
-    content: MathNode;
-    bracketType: BracketType;
-
-    constructor(content: MathNode, type: BracketType) {
-        super();
-
-        this.content = content;
-        this.bracketType = type;
-    }
-
-    asLatex(): string {
-        switch (this.bracketType) {
-            case BracketType.Parentheses:
-                return `\\left(${this.content.asLatex()}\\right)`;
-            case BracketType.Square:
-                return `\\left[${this.content.asLatex()}\\right]`;
-            case BracketType.Curly:
-                return `\\left\\{${this.content.asLatex()}\\right\\}`;
-        }
-    }
-}
-
-function stripParentheses(node: MathNode): MathNode {
-    if (node instanceof Bracketed) {
-        if (node.bracketType === BracketType.Parentheses) {
-            return node.content;
-        }
-    }
-
-    return node;
-}
-
-export class NexMathParser extends ParserBase {
+export class NexMathParser {
     tokenStream: TokenStream;
-    keywords: NexMathKeywords;
 
     constructor(tokenStream: TokenStream) {
-        super();
-
         this.tokenStream = tokenStream;
-        this.keywords = NexMathKeywords.populated();
     }
 
-    private _parseCharacters(starting: string): VerbatimLatex {
-        let content = starting;
+    parseAlphanumeric(): VerbatimLatex {
+        let content = "";
 
         while (true) {
-            let token = this.tokenStream.nextToken(MODE_NEX_MATH_CHARACTER, { peek: true });
-
-            if (!token) {
-                return new VerbatimLatex(content);
-            }
-
-            // console.log("PC",token,token.tokenTypeName(),"\n");
-
-            if (token.type === TokenType.NMAlphanumeric) {
-                content += token.content;
-                this.tokenStream.consumeToken(token);
-            } else {
-                return new VerbatimLatex(content);
-            }
-        }
-    }
-
-    /**
-     * Similar to `unexpectedTokenError`, but with a clearer, NeX math focused error message
-     */
-    private _unsupportedCharacterError(): never {
-        this.tokenStream.consumeWhitespace(false);
-        let offendingChracter = this.tokenStream.getRemainingContent()[0];
-        this.throwSyntaxError(
-            `Character ${userFriendlyCharacterRepresentation(
-                offendingChracter
-            )} is invalid in NeX math`
-        );
-    }
-
-    private _parseMatrixRow(): Expression[] {
-        let row: Expression[] = [];
-
-        while (true) {
-            let nextCell = this._parseExpression([
-                TokenType.NMBracketRight,
-                TokenType.NMArgumentSeparator,
+            let previousCharacterIsLetter =
+                "abcdefghijklmnopqrstuvwxyZABCDEFGHIJKLMNOPQRSTUVWXYZ".includes(
+                    content[content.length - 1]
+                );
+            let nextToken = this.tokenStream.matchToken([
+                !previousCharacterIsLetter && NM_KEYWORD,
+                !previousCharacterIsLetter && NM_MATRIX_START,
+                !previousCharacterIsLetter && NM_CASES_START,
+                NM_ALPHANUMERIC,
             ]);
 
-            row.push(nextCell.expression);
-
-            // Check whether we encountered a "]", indicating
-            // the end of the passed row cells
-            if (nextCell.stoppedOn.type === TokenType.NMBracketRight) {
-                break;
-            }
-        }
-
-        return row;
-    }
-
-    private _parseMatrix(): Matrix {
-        let rows: Expression[][] = [];
-
-        while (true) {
-            let token = this.tokenStream.nextToken(MODE_NEX_MATH_MATRIX);
-
-            if (!token) {
-                this.unexpectedTokenError();
+            if (!nextToken || nextToken.type !== NM_ALPHANUMERIC) {
+                return new VerbatimLatex(content);
             }
 
-            if (token.type === TokenType.NMBracketLeft) {
-                let newRow = this._parseMatrixRow();
-
-                // validate that this row has at least one element
-                if (newRow.length === 1 && newRow[0].children.length === 0) {
-                    this.throwSyntaxError(`Cannot create empty matrix row`, token);
-                }
-
-                // validate that this row is the same length as all previous rows
-                for (let existingRow of rows) {
-                    if (newRow.length !== existingRow.length) {
-                        this.throwSyntaxError(
-                            `All matrix rows must have the same size; incompatible new row of length ${newRow.length} with existing row(s) of length ${existingRow.length}`,
-                            token
-                        );
-                    }
-                }
-                rows.push(newRow);
-            } else if (token.type === TokenType.NMParenRight) {
-                // validate that this matrix has at least one row
-                if (rows.length === 0) {
-                    this.throwSyntaxError(`Cannot create empty matrix`, token);
-                }
-
-                return new Matrix(rows);
+            if (nextToken.type === NM_ALPHANUMERIC) {
+                this.tokenStream.consumeToken(nextToken);
+                content += nextToken.content;
             }
         }
     }
 
-    private _parseText(): Text {
-        let text = "";
-
-        while (true) {
-            let token = this.tokenStream.nextToken(MODE_NEX_TEXT_ENV);
-
-            if (!token) {
-                this._unsupportedCharacterError();
-            }
-
-            switch (token.type) {
-                case TokenType.NMQuotationMark:
-                    return new Text(text);
-                case TokenType.NMTextCharacter:
-                    text += token.content;
-                    break;
-                default:
-                    this.debug_unhandledTokenError(token);
-            }
+    parseNextNode(previousNode: MathNode | null, inline: boolean): MathNode {
+        if (!inline) {
+            this.tokenStream.grabOptionalToken(WHITESPACE_INCL_NEWLINES);
+        } else {
+            this.tokenStream.grabOptionalToken(WHITESPACE);
         }
-    }
 
-    private _parseNextNode(previousNode: MathNode | null): MathNode {
-        while (true) {
-            let token = this.tokenStream.nextToken(MODE_NEX_MATH);
+        return this.tokenStream.matchTokenAndBranch<MathNode>({
+            branches: [
+                {
+                    tokenType: NM_KEYWORD,
+                    consumeToken: true,
+                    handler: (token) => {
+                        let keyword = NexMathKeywords.getInstance().getKeyword(token.content);
 
-            if (!token) {
-                this._unsupportedCharacterError();
-            }
+                        // If this keyword takes no arguments, return it as is
+                        if (keyword.maxArguments === 0) {
+                            return new VerbatimLatex(keyword.latexTemplate);
+                        }
 
-            switch (token.type) {
-                case TokenType.NMKeyword: {
-                    let keyword = this.keywords.getKeyword(token.content);
-
-                    // check whether this keyword takes arguments
-                    if (keyword.maxArguments > 0) {
-                        // this keyword takes arguments; check to see whether if
-                        // there are parentheses directly following it, indicating
-                        // that there are provided arguments
-
-                        let nextToken = this.tokenStream.nextToken(MODE_NEX_MATH, { peek: true });
-                        let providedArguments: (MathNode | null)[] = [];
+                        let providedArguments: (Expression | null)[] = [];
 
                         for (let i = 0; i < keyword.maxArguments; i++) {
                             providedArguments.push(null);
                         }
 
-                        if (nextToken && nextToken.type === TokenType.NMParenLeft) {
+                        // this keyword takes arguments; check to see whether if
+                        // there are parentheses directly following it, indicating
+                        // that there are provided arguments
+
+                        let nextToken = this.tokenStream.matchToken([NM_PAREN_LEFT]);
+
+                        if (nextToken) {
                             // there seem to be provided arguments, parse as necessary
 
                             this.tokenStream.consumeToken(nextToken);
@@ -449,117 +111,332 @@ export class NexMathParser extends ParserBase {
 
                             while (true) {
                                 if (argIndex >= keyword.maxArguments) {
-                                    throw new NexSyntaxError(
-                                        this.getCurrentSourceLocation(),
+                                    this.tokenStream.throwSyntaxError(
                                         `Too many arguments provided for NeX math keyword "${keyword.keyword}" (max ${keyword.maxArguments})`
                                     );
                                 }
 
-                                let nextArgument = this._parseExpression([
-                                    TokenType.NMParenRight,
-                                    TokenType.NMArgumentSeparator,
-                                ]);
+                                let nextArgument = this.parseExpression(
+                                    [NM_PAREN_RIGHT, NM_ARGUMENT_SEPARATOR],
+                                    inline
+                                );
 
                                 providedArguments[argIndex] = nextArgument.expression;
 
                                 // Check whether we encountered a ")", indicating
                                 // the end of the passed arguments
-                                if (nextArgument.stoppedOn.type === TokenType.NMParenRight) {
+                                if (nextArgument.terminatingToken.type === NM_PAREN_RIGHT) {
                                     break;
                                 }
 
                                 argIndex += 1;
                             }
+                        } else if (keyword.minArguments > 0) {
+                            // Make sure that, if the "()" doesn't appear after the keyword
+                            // that this keyword doesn't requre arguments
+
+                            this.tokenStream.throwSyntaxError(
+                                `Keyword "${keyword.keyword}" requires arguments.`,
+                                token
+                            );
                         }
-                        return new LatexTemplate(providedArguments, keyword.latexTemplate);
-                    } else {
-                        // Otherwise, just return the latex template verbatim
-                        return new VerbatimLatex(keyword.latexTemplate);
-                    }
-                }
-                case TokenType.NMAlphanumeric:
-                    return this._parseCharacters(token.content);
-                case TokenType.NMParenLeft:
-                    return new Bracketed(
-                        this._parseExpression([TokenType.NMParenRight]).expression,
-                        BracketType.Parentheses
-                    );
-                case TokenType.NMFrac: {
-                    if (previousNode === null) {
-                        throw new NexSyntaxError(
-                            this.getCurrentSourceLocation(),
-                            "Missing numerator"
-                        );
-                    }
-                    let denominator = this._parseNextNode(null);
 
-                    return new Fraction(
-                        stripParentheses(previousNode),
-                        stripParentheses(denominator)
-                    );
-                }
-                case TokenType.NMExponent: {
-                    if (previousNode === null) {
-                        throw new NexSyntaxError(
-                            this.getCurrentSourceLocation(),
-                            "Missing base for exponent"
-                        );
-                    }
-                    let exponent = this._parseNextNode(null);
+                        // Check to make sure that the minimum number of arguments is specified
 
-                    return new Exponent(previousNode, stripParentheses(exponent));
-                }
-                case TokenType.NMSubscript: {
-                    if (previousNode === null) {
-                        throw new NexSyntaxError(
-                            this.getCurrentSourceLocation(),
-                            "Missing base for subscript"
-                        );
-                    }
-                    let exponent = this._parseNextNode(null);
+                        let argsSpecified = 0;
 
-                    return new Subscript(previousNode, stripParentheses(exponent));
+                        for (let arg of providedArguments) {
+                            if (arg !== null && !arg.isEmpty()) {
+                                argsSpecified += 1;
+                            }
+                        }
+
+                        if (argsSpecified < keyword.minArguments) {
+                            this.tokenStream.throwSyntaxError(
+                                `Keyword "${keyword.keyword}" requires arguments, but ${
+                                    argsSpecified === 0 ? "none" : "only " + argsSpecified
+                                } were specified.`,
+                                token
+                            );
+                        }
+
+                        return new KeywordNode(keyword, providedArguments);
+                    },
+                },
+                {
+                    tokenType: NM_MATRIX_START,
+                    consumeToken: true,
+                    handler: () => {
+                        return this.parseMatrix(inline);
+                    },
+                },
+                {
+                    tokenType: NM_CASES_START,
+                    consumeToken: true,
+                    handler: () => {
+                        return this.parseCases(inline);
+                    },
+                },
+                {
+                    tokenType: NM_TEXT_START,
+                    consumeToken: true,
+                    handler: ()=>{
+                        return this.parseText();
+                    }
+                },
+                {
+                    tokenType: NM_PAREN_LEFT,
+                    consumeToken: true,
+                    handler: () => {
+                        return new Bracketed(
+                            this.parseExpression([NM_PAREN_RIGHT], inline).expression,
+                            BracketType.Parentheses
+                        );
+                    },
+                },
+                {
+                    tokenType: NM_BRACKET_LEFT,
+                    consumeToken: true,
+                    handler: () => {
+                        return new Bracketed(
+                            this.parseExpression([NM_BRACKET_RIGHT], inline).expression,
+                            BracketType.Square
+                        );
+                    },
+                },
+                {
+                    tokenType: NM_CURLY_LEFT,
+                    consumeToken: true,
+                    handler: () => {
+                        return new Bracketed(
+                            this.parseExpression([NM_CURLY_RIGHT], inline).expression,
+                            BracketType.Curly
+                        );
+                    },
+                },
+                {
+                    tokenType: NM_FRAC,
+                    consumeToken: true,
+                    handler: (token) => {
+                        if (previousNode === null) {
+                            this.tokenStream.throwSyntaxError(
+                                `Fraction is missing a numerator`,
+                                token
+                            );
+                        }
+
+                        let denominator = this.parseNextNode(null, inline);
+
+                        return new Fraction(
+                            stripParentheses(previousNode),
+                            stripParentheses(denominator)
+                        );
+                    },
+                },
+                {
+                    tokenType: NM_EXPONENT,
+                    consumeToken: true,
+                    handler: (token) => {
+                        if (previousNode === null) {
+                            this.tokenStream.throwSyntaxError(`Exponent is missing a base`, token);
+                        }
+
+                        let exp = this.parseNextNode(null, inline);
+
+                        return new Exponent(previousNode, stripParentheses(exp));
+                    },
+                },
+                {
+                    tokenType: NM_SUBSCRIPT,
+                    consumeToken: true,
+                    handler: (token) => {
+                        if (previousNode === null) {
+                            this.tokenStream.throwSyntaxError(`Subscript is missing a base`, token);
+                        }
+
+                        let sub = this.parseNextNode(null, inline);
+
+                        return new Subscript(previousNode, stripParentheses(sub));
+                    },
+                },
+                {
+                    tokenType: NM_ALPHANUMERIC,
+                    handler: () => {
+                        return this.parseAlphanumeric();
+                    },
+                },
+            ],
+        });
+    }
+
+    parseCases(inline: boolean): Cases {
+        let cases: Case[] = [];
+
+        while (true) {
+            if (!inline) {
+                this.tokenStream.grabOptionalToken(WHITESPACE_INCL_NEWLINES);
+            } else {
+                this.tokenStream.grabOptionalToken(WHITESPACE);
+            }
+
+            let nextCase = this.parseExpression(
+                [NM_CASES_WHEN, NM_PAREN_RIGHT, NM_ARGUMENT_SEPARATOR],
+                inline
+            );
+
+            if (nextCase.expression.isEmpty()) {
+                this.tokenStream.throwSyntaxError(
+                    "Empty case not allowed",
+                    nextCase.terminatingToken
+                );
+            }
+
+            if (nextCase.terminatingToken.type === NM_ARGUMENT_SEPARATOR) {
+                cases.push(new Case(nextCase.expression, null));
+            } else if (nextCase.terminatingToken.type === NM_CASES_WHEN) {
+                let condition = this.parseExpression(
+                    [NM_PAREN_RIGHT, NM_ARGUMENT_SEPARATOR],
+                    inline
+                );
+
+                cases.push(new Case(nextCase.expression, condition.expression));
+
+                if (condition.terminatingToken.type === NM_PAREN_RIGHT) {
+                    return new Cases(cases);
                 }
-                case TokenType.NMQuotationMark:
-                    return this._parseText();
-                case TokenType.NMMatrixDecl:
-                    return this._parseMatrix();
-                default:
-                    this.debug_unhandledTokenError(token);
+            } else {
+                return new Cases(cases);
             }
         }
     }
 
-    /**
-     * Sequentially parse MathNodes into an `Expression` MathNode until
-     * one of the token types in `stopOnTokenTypes` is reached.
-     *
-     * Return the compiled `Expression` as well as the token that
-     * halted this method.
-     */
-    private _parseExpression(stopOnTokenTypes: TokenType[]): {
+    parseText(): MathText {
+        let text = "";
+
+        while (true) {
+            let match = this.tokenStream.grabToken([NM_TEXT_END, TEXT_CHARACTER]);
+
+            if (match.type === NM_TEXT_END) {
+                return new MathText(text);
+            }
+
+            text += match.content;
+        }
+    }
+
+    parseMatrixRow(inline: boolean): Expression[] {
+        let row: Expression[] = [];
+
+        while (true) {
+            if (!inline) {
+                this.tokenStream.grabOptionalToken(WHITESPACE_INCL_NEWLINES);
+            } else {
+                this.tokenStream.grabOptionalToken(WHITESPACE);
+            }
+            let nextCell = this.parseExpression([NM_BRACKET_RIGHT, NM_ARGUMENT_SEPARATOR], inline);
+
+            row.push(nextCell.expression);
+
+            // Check whether we encountered a "]", indicating
+            // the end of the passed row cells
+            if (nextCell.terminatingToken.type === NM_BRACKET_RIGHT) {
+                break;
+            }
+        }
+
+        return row;
+    }
+
+    parseMatrix(inline: boolean): Matrix {
+        let rows: Expression[][] = [];
+
+        while (true) {
+            if (!inline) {
+                this.tokenStream.grabOptionalToken(WHITESPACE_INCL_NEWLINES);
+            } else {
+                this.tokenStream.grabOptionalToken(WHITESPACE);
+            }
+
+            let matrix = this.tokenStream.matchTokenAndBranch<void | Matrix>({
+                branches: [
+                    {
+                        tokenType: NM_BRACKET_LEFT,
+                        consumeToken: true,
+                        handler: (token) => {
+                            let newRow = this.parseMatrixRow(inline);
+
+                            // validate that this row has at least one element
+                            if (newRow.length === 1 && newRow[0].children.length === 0) {
+                                this.tokenStream.throwSyntaxError(
+                                    `Cannot create empty matrix row`,
+                                    token
+                                );
+                            }
+
+                            // validate that this row is the same length as all previous rows
+                            for (let existingRow of rows) {
+                                if (newRow.length !== existingRow.length) {
+                                    this.tokenStream.throwSyntaxError(
+                                        `All matrix rows must have the same size; incompatible new row of length ${newRow.length} with existing row(s) of length ${existingRow.length}`,
+                                        token
+                                    );
+                                }
+                            }
+                            rows.push(newRow);
+                        },
+                    },
+                    {
+                        tokenType: NM_PAREN_RIGHT,
+                        consumeToken: true,
+                        handler: (token) => {
+                            // validate that this matrix has at least one row
+                            if (rows.length === 0) {
+                                this.tokenStream.throwSyntaxError(
+                                    `Cannot create empty matrix`,
+                                    token
+                                );
+                            }
+
+                            return new Matrix(rows);
+                        },
+                    },
+                ],
+            });
+
+            if (matrix) {
+                return matrix;
+            }
+        }
+    }
+
+    parseExpression(
+        closingTokenTypes: TokenType[],
+        inline: boolean
+    ): {
         expression: Expression;
-        stoppedOn: Token;
+        terminatingToken: Token;
     } {
         let currentExpression = new Expression([]);
 
         while (true) {
-            this.tokenStream.consumeWhitespace(true);
-            let test = this.tokenStream.nextToken(
-                new LexingMode(stopOnTokenTypes, { skipWhitespace: false }),
-                { peek: true }
-            );
+            if (!inline) {
+                this.tokenStream.grabOptionalToken(WHITESPACE_INCL_NEWLINES);
+            } else {
+                this.tokenStream.grabOptionalToken(WHITESPACE);
+            }
 
-            if (test !== null) {
-                this.tokenStream.consumeToken(test);
+            let stopTest = this.tokenStream.matchToken(closingTokenTypes);
+            if (stopTest) {
+                this.tokenStream.consumeToken(stopTest);
                 return {
                     expression: currentExpression,
-                    stoppedOn: test,
+                    terminatingToken: stopTest,
                 };
             }
 
-            let nextNode = this._parseNextNode(
-                currentExpression.children[currentExpression.children.length - 1] ?? null
+            let nextNode = this.parseNextNode(
+                currentExpression.children[currentExpression.children.length - 1] ?? null,
+                inline
             );
 
             // If the next node is a fraction, exponent, or subscript
@@ -578,40 +455,14 @@ export class NexMathParser extends ParserBase {
             currentExpression.children.push(nextNode);
         }
     }
+}
 
-    /**
-     * To be invoked directly following a `${`.
-     *
-     * Return the content converted to LaTeX code
-     */
-    parseBlock(): string {
-        return this._parseExpression([TokenType.BlockEnd]).expression.asLatex();
+function stripParentheses(node: MathNode): MathNode {
+    if (node instanceof Bracketed) {
+        if (node.bracketType === BracketType.Parentheses) {
+            return node.content;
+        }
     }
 
-    /**
-     * To be invoked directly following a `!`.
-     *
-     * Return the content converted to LaTeX code
-     */
-    parseShorthand(): string {
-        return this._parseNextNode(null).asLatex();
-    }
-
-    /**
-     * To be invoked directly following a `$`
-     *
-     * Return the content converted to LaTeX code
-     */
-    parseInline(): string {
-        return this._parseExpression([TokenType.InlineMathModeEnd]).expression.asLatex();
-    }
-
-    /**
-     * To be invoked directly following a Desmos `:equation` setting
-     *
-     * Return the content converted to LaTeX code
-     */
-    parseSetting(): string {
-        return this._parseExpression([TokenType.EOL]).expression.asLatex();
-    }
+    return node;
 }

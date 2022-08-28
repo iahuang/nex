@@ -1,552 +1,516 @@
-/**
- * NeX main parser.
- */
-
-import { SourceLocation, SourceReference } from "../source";
+import { SourceReference } from "../source";
 import {
-    BlockMath,
-    Callout,
-    CodeBlock,
-    DesmosElement,
-    Document,
-    Element,
-    Header,
-    InlineCodeBlock,
-    InlineMath,
-    Paragraph,
     Text,
+    Paragraph,
+    Document,
+    Textual,
+    Italic,
+    Header,
+    CodeBlock,
+    InlineMath,
+    BlockMath,
+    InlineCode,
+    Element,
+    List,
+    ListItem,
+    ListOrdering,
+    Callout,
 } from "./ast";
-import { LexingMode, TokenStream } from "./lexer";
 import { NexMathParser } from "./nex_math/parser";
-import { ParserBase, SettingHandler } from "./parser_base";
-import { TokenType, Token } from "./token";
+import { SettingHandler } from "./setting_handler";
+import { TokenType } from "./token";
+import { TokenStream } from "./token_stream";
+import {
+    NEWLINE,
+    END_OF_FILE,
+    ITALIC_START,
+    TEXT_CHARACTER,
+    ITALIC_END,
+    HEADER,
+    SETTING_VALUE,
+    SETTING_DECLARATION,
+    LANG_CODE_BLOCK_START,
+    WHITESPACE,
+    CODE_BLOCK_LINE,
+    CODE_BLOCK_END,
+    INLINE_MATH_START,
+    INLINE_MATH_END,
+    BLOCK_MATH_START,
+    BLOCK_MATH_END,
+    INLINE_CODE_START,
+    INLINE_CODE_END,
+    CODE_BLOCK_START,
+    SHORTHAND_INLINE_MATH,
+    LIST_ITEM,
+    LIST_ORDERING,
+    LIST_ORDERING_VALUE,
+    WHITESPACE_INCL_NEWLINES,
+    BLOCK_DECLARATION,
+    BLOCK_START,
+    BLOCK_END,
+} from "./token_types";
 
-// lexing modes
-const MODE_TOPLEVEL = new LexingMode(
-    [
-        TokenType.BlockDeclaration,
-        TokenType.SettingDeclaration,
-        TokenType.H1,
-        TokenType.H2,
-        TokenType.H3,
-        TokenType.H4,
-        TokenType.NexMathBlockStart,
-        TokenType.LangCodeBegin,
-        TokenType.CodeBegin,
-        TokenType.EOF,
-        TokenType.EOL,
-        TokenType.TextCharacter,
-    ],
-    {
-        skipWhitespace: true,
+function getListIndentFromListItemTokenContent(content: string): number {
+    let i = 0;
+
+    for (let c of content) {
+        if (c === "-") {
+            i += 1;
+        }
     }
-);
 
-const MODE_TOPLEVELCALLOUT = new LexingMode(
-    [
-        TokenType.BlockDeclaration,
-        TokenType.SettingDeclaration,
-        TokenType.H1,
-        TokenType.H2,
-        TokenType.H3,
-        TokenType.H4,
-        TokenType.NexMathBlockStart,
-        TokenType.LangCodeBegin,
-        TokenType.CodeBegin,
-        TokenType.BlockEnd,
-        TokenType.EOL,
-        TokenType.TextCharacter,
-    ],
-    {
-        skipWhitespace: true,
-    }
-);
-
-const MODE_INLINE_CODE_BLOCK = new LexingMode(
-    [TokenType.InlineCodeEnd, TokenType.TextCharacter],
-    { skipWhitespace: true }
-);
-
-const MODE_TEXT_INLINE = new LexingMode(
-    [
-        TokenType.ItalicBegin,
-        TokenType.InlineMathModeBegin,
-        TokenType.ShorthandInlineMath,
-        TokenType.InlineCodeBegin,
-        TokenType.TextCharacter,
-        TokenType.EOL,
-        TokenType.EOF,
-    ],
-    {
-        skipWhitespace: false,
-    }
-);
-
-const MODE_DESMOS_BLOCK = new LexingMode([TokenType.BlockEnd, TokenType.EOL], {
-    skipWhitespace: true,
-});
-
-const MODE_CODE_BLOCK = new LexingMode(
-    [TokenType.CodeEnd, TokenType.EOL, TokenType.TextCharacter],
-    {
-        skipWhitespace: false,
-    }
-);
-
-export class Warning {
-    location: SourceLocation;
-    message: string;
-
-    constructor(location: SourceLocation, message: string) {
-        this.location = location;
-        this.message = message;
-    }
+    return i;
 }
 
-export class Parser extends ParserBase {
+export class Parser {
     source: SourceReference;
     tokenStream: TokenStream;
     nexMathParser: NexMathParser;
-    private _warnings: Warning[];
 
     constructor(source: SourceReference) {
-        super();
-
         this.source = source;
-        this._warnings = [];
         this.tokenStream = new TokenStream(source);
         this.nexMathParser = new NexMathParser(this.tokenStream);
     }
 
-    /**
-     * To be invoked after a `BlockDeclaration` token is encountered
-     */
-    private _parseBlock(): Element {
-        let blockNameToken = this.expectToken(TokenType.BlockName, { skipWhitespace: false });
-
-        // Allowing newlines allows for the following syntax, where the bracket is on
-        // the next line (not very pretty, but technically allowed):
-        // | #blockname
-        // | {
-        // |     ...
-        // | }
-        this.expectToken(TokenType.BlockBegin, {
-            skipWhitespace: true,
-            skipNewlines: true,
-        });
-
-        let blockName = blockNameToken.content;
-
-        // Determine type of block and parse accordingly
-        switch (blockName) {
-            case "callout":
-                return this._parseCallout();
-            case "desmos":
-                return this._parseDesmos();
-            default:
-                this.throwSyntaxError(`Unknown block type "${blockName}"`, blockNameToken);
-        }
-    }
-
-    /**
-     * To be invoked after a `BlockName` token is encountered with content `"callout"`
-     * (in the `_parseBlock` method)
-     */
-    private _parseCallout(): Callout {
-        let callout = new Callout();
-
-        while (true) {
-            this.tokenStream.consumeWhitespace(false);
-            let token = this.tokenStream.nextToken(MODE_TOPLEVELCALLOUT);
-
-            if (!token) {
-                this.unexpectedTokenError();
-            }
-
-            let setting = this._parseSetting(token);
-
-            if (setting) {
-                switch (setting.name) {
-                    case "title":
-                        callout.title = setting.settingValue;
-                        break;
-                    default:
-                        this.addWarning(`Unknown setting name "${setting.name}"`);
-                        break;
-                }
-            }
-
-            let element = this._parseTopLevelToken(token, MODE_TOPLEVELCALLOUT);
-
-            if (element) {
-                callout.children.push(element);
-            }
-
-            if (token.type === TokenType.BlockEnd) {
-                return callout;
-            }
-        }
-    }
-
-    private _parseDesmos(): DesmosElement {
-        let start = this.getCurrentSourceLocation();
-        let settingHandler = this.createSettingHandler([
-            {
-                name: "equation",
-                allowDuplicates: true,
-                requiresArgument: true,
-                handler: () => {
-                    this.expectToken(TokenType.InlineMathModeBegin, { skipWhitespace: true });
-                    return this.nexMathParser.parseInline();
-                },
-            },
-        ]);
-
-        while (true) {
-            settingHandler.handle();
-
-            let token = this.tokenStream.nextToken(MODE_DESMOS_BLOCK);
-
-            if (!token) {
-                this.unexpectedTokenError();
-            }
-
-            switch (token.type) {
-                case TokenType.BlockEnd: {
-                    let equation = settingHandler.getSettingValue("equation");
-
-                    if (!equation) {
-                        this.throwSyntaxError("Desmos block must have an equation", start);
-                    }
-                    return new DesmosElement(equation);
-                }
-            }
-        }
-    }
-
-    /**
-     * To be invoked when any inline element is encountered.
-     */
-    private _parseParagraph(parentMode: LexingMode, startingToken: Token): Paragraph {
-        let paragraph = new Paragraph();
-        this.tokenStream.unconsumeToken(startingToken);
-        this.tokenStream.consumeWhitespace(false);
-
-        while (true) {
-            // Peek the next token
-            let token = this.tokenStream.nextToken(MODE_TEXT_INLINE, { peek: true });
-
-            // if the next token can't be matched (e.g. EOF, let the parent environment handle it)
-            if (!token) {
-                return paragraph;
-            }
-
-            switch (token.type) {
-                case TokenType.TextCharacter:
-                    paragraph.children.push(this._parseText());
-                    break;
-                case TokenType.InlineMathModeBegin: {
-                    this.tokenStream.consumeToken(token);
-                    let latex = this.nexMathParser.parseInline();
-                    paragraph.children.push(new InlineMath(latex));
-                    break;
-                }
-                case TokenType.InlineCodeBegin:
-                    this.tokenStream.consumeToken(token);
-                    paragraph.children.push(this._parseInlineCodeBlock());
-                    break;
-                case TokenType.EOL:
-                    // consume the token we peeked so we can peek the token after that
-                    this.tokenStream.consumeToken(token);
-
-                    // Paragraphs can potentially span multiple lines.
-                    //
-                    // Peek next token in the context of the containing block;
-                    // if the next token would end the paragraph,
-                    // (i.e. the next token is another EOL, an EOF, a the start of a block, etc.)
-                    // then return.
-                    {
-                        // enclosed in a block (https://eslint.org/docs/latest/rules/no-case-declarations)
-
-                        let nextToken = this.tokenStream.nextToken(parentMode, { peek: true });
-
-                        // If, for whatever reason, we can't match any tokens,
-                        // end the paragraph.
-                        if (!nextToken) {
-                            return paragraph;
-                        }
-
-                        // If the next token is another EOL, i.e. the paragraph
-                        // is followed by a blank line, end the paragraph
-                        if (nextToken.type === TokenType.EOL) {
-                            return paragraph;
-                        }
-
-                        // If the next token isn't valid as an inline token, then
-                        // we assume that the next token should end the current paragraph
-                        // block.
-                        if (!MODE_TEXT_INLINE.validTokenTypes.includes(nextToken.type)) {
-                            return paragraph;
-                        }
-
-                        // otherwise, trim leading whitespace and keep parsing the paragraph
-                        this.tokenStream.consumeWhitespace(false);
-
-                        // add a space character
-                        paragraph.children.push(new Text(" "));
-                    }
-                    break;
-                case TokenType.ShorthandInlineMath:
-                    this.tokenStream.consumeToken(token);
-                    paragraph.children.push(new InlineMath(this.nexMathParser.parseShorthand()));
-                    break;
-                case TokenType.EOF:
-                    return paragraph;
-                default:
-                    this.debug_unhandledTokenError(token);
-            }
-        }
-    }
-
-    private _parseInlineCodeBlock(): InlineCodeBlock {
-        let code = "";
-
-        while (true) {
-            let token = this.tokenStream.nextToken(MODE_INLINE_CODE_BLOCK);
-
-            if (!token) {
-                this.unexpectedTokenError();
-            }
-
-            switch (token.type) {
-                case TokenType.TextCharacter:
-                    code += token.content;
-                    break;
-                case TokenType.InlineCodeEnd: {
-                    return new InlineCodeBlock(code);
-                }
-                default:
-                    this.debug_unhandledTokenError(token);
-            }
-        }
-    }
-
-    private _parseCodeBlock(language: string | null): CodeBlock {
-        let code = "";
-
-        this.expectToken(TokenType.EOL, { skipWhitespace: false });
-
-        while (true) {
-            let token = this.tokenStream.nextToken(MODE_CODE_BLOCK);
-
-            if (!token) {
-                this.unexpectedTokenError();
-            }
-
-            switch (token.type) {
-                case TokenType.TextCharacter:
-                    code += token.content;
-                    break;
-                case TokenType.EOL:
-                    code += token.content;
-                    break;
-                case TokenType.CodeEnd: {
-                    return new CodeBlock(code, language);
-                }
-                default:
-                    this.debug_unhandledTokenError(token);
-            }
-        }
-    }
-
-    private _parseHeader(depth: number): Header {
-        let content = new Paragraph();
-        this.tokenStream.consumeWhitespace(false);
-
-        while (true) {
-            // Peek the next token
-            let token = this.tokenStream.nextToken(MODE_TEXT_INLINE, { peek: true });
-
-            if (!token) {
-                this.unexpectedTokenError();
-            }
-
-            switch (token.type) {
-                case TokenType.TextCharacter:
-                    content.children.push(this._parseText());
-                    break;
-                case TokenType.InlineMathModeBegin:
-                    this.tokenStream.consumeToken(token);
-                    content.children.push(new InlineMath(this.nexMathParser.parseInline()));
-                    break;
-                case TokenType.EOF:
-                    return new Header(depth, content);
-                case TokenType.EOL:
-                    return new Header(depth, content);
-                default:
-                    this.debug_unhandledTokenError(token);
-            }
-        }
-    }
-
-    private _parseText(): Text {
+    parseText(end: TokenType | null = null): Text {
         let text = "";
 
         while (true) {
-            // When we get the next token as an inline token, there are only three possibilities
-            // for the type of token we get:
-            //  - a TextCharacter token
-            //  - a token denoting the start of some inline formatting element such as inline math,
-            //    italics, etc.
-            //  - EOL
-            //
-            // we peek this token so we can decide whether to consume it later.
-            let token = this.tokenStream.nextToken(MODE_TEXT_INLINE, { peek: true });
+            let token = this.tokenStream.matchTokenStrict([
+                NEWLINE,
+                END_OF_FILE,
+                ITALIC_START,
+                end,
+                INLINE_CODE_START,
+                INLINE_MATH_START,
+                SHORTHAND_INLINE_MATH,
+                TEXT_CHARACTER,
+            ]);
 
-            if (!token) {
-                this.unexpectedTokenError();
-            }
-
-            if (token.type === TokenType.TextCharacter) {
-                // if we encounter a text character, consume it and add it to the text
-                // element we're building
-
-                text += token.content;
+            if (token.type === TEXT_CHARACTER) {
                 this.tokenStream.consumeToken(token);
+                text += token.content;
             } else {
-                // otherwise, we assume this token to be the end of the text element.
-                // we build the `Text` element object and add it to the parent without
-                // consuming the token we just found (we leave it to the parent environment)
-                // to deal with.
-
-                let textElement = new Text(text);
-
-                return textElement;
+                return new Text(text);
             }
         }
     }
 
-    /**
-     * Handles parsing of setting declarations (e.g. `title: My Document Title`)
-     *
-     * If the provided token is of type `SettingDeclaration`, then parse
-     * the following setting expression and return it; otherwise, return `null`.
-     *
-     */
-    private _parseSetting(token: Token): { name: string; settingValue: string } | null {
-        if (token.type === TokenType.SettingDeclaration) {
-            let settingName = this.expectToken(TokenType.SettingName, {
-                skipWhitespace: false,
-            });
-
-            this.tokenStream.consumeWhitespace(false);
-
-            let settingExpression = this.expectToken(TokenType.SettingExpression, {
-                skipWhitespace: true,
-            });
-
-            this._expectEndOfStatement();
-
-            return {
-                name: settingName.content,
-                settingValue: settingExpression.content,
-            };
-        }
-
-        return null;
+    parseNextTextualElement(): Textual | null {
+        return this.tokenStream.matchTokenAndBranch<Textual | null>({
+            branches: [
+                {
+                    tokenType: ITALIC_START,
+                    handler: (token) => {
+                        this.tokenStream.consumeToken(token);
+                        let text = this.parseText(ITALIC_END);
+                        this.tokenStream.grabToken([ITALIC_END]);
+                        return new Italic(text.content);
+                    },
+                },
+                {
+                    tokenType: SHORTHAND_INLINE_MATH,
+                    consumeToken: true,
+                    handler: () => {
+                        return new InlineMath(
+                            this.nexMathParser.parseNextNode(null, true).asLatex()
+                        );
+                    },
+                },
+                {
+                    tokenType: INLINE_MATH_START,
+                    consumeToken: true,
+                    handler: () => {
+                        return new InlineMath(
+                            this.nexMathParser
+                                .parseExpression([INLINE_MATH_END], true)
+                                .expression.asLatex()
+                        );
+                    },
+                },
+                {
+                    tokenType: INLINE_CODE_START,
+                    consumeToken: true,
+                    handler: () => {
+                        return this.parseInlineCode();
+                    },
+                },
+                {
+                    tokenType: TEXT_CHARACTER,
+                    handler: () => {
+                        return this.parseText();
+                    },
+                },
+            ],
+            default: () => {
+                return null;
+            },
+        });
     }
 
-    /**
-     * Handle parsing of elements that can exist in any top-level context
-     * (callout blocks, block math, etc.). Does not handle context-specific elements,
-     * i.e. list item elements inside of list blocks.
-     */
-    private _parseTopLevelToken(token: Token, parentMode: LexingMode): Element | null {
-        switch (token.type) {
-            case TokenType.BlockDeclaration:
-                return this._parseBlock();
-            case TokenType.NexMathBlockStart:
-                return new BlockMath(this.nexMathParser.parseBlock());
-            case TokenType.CodeBegin:
-                return this._parseCodeBlock(null);
-            case TokenType.LangCodeBegin:
-                return this._parseCodeBlock(token.content.substring(3));
-            case TokenType.TextCharacter:
-                return this._parseParagraph(parentMode, token);
-            case TokenType.H1:
-                return this._parseHeader(1);
-            case TokenType.H2:
-                return this._parseHeader(2);
-            case TokenType.H3:
-                return this._parseHeader(3);
-            case TokenType.H4:
-                return this._parseHeader(4);
-        }
+    parseParagraph(terminatingToken: TokenType | null = null): Paragraph {
+        let paragraph = new Paragraph();
 
-        return null;
+        while (true) {
+            let textElement = this.parseNextTextualElement();
+
+            if (textElement) {
+                paragraph.children.push(textElement);
+            } else {
+                // If the `parseNextTextualElement` token was unable to match, it means
+                // there was either a newline or an EOF.
+                //
+                // If the next token is a newline, see if the following line
+                // indicates that the paragraph should end, i.e. the next line
+                // starts a block element such as a code block, or whether
+                // the paragraph should continue.
+                let newline = this.tokenStream.grabOptionalToken(NEWLINE);
+
+                if (newline) {
+                    this.tokenStream.grabOptionalToken(WHITESPACE);
+                    let nextToken = this.tokenStream.matchToken([
+                        NEWLINE,
+                        END_OF_FILE,
+                        BLOCK_MATH_START,
+                        LANG_CODE_BLOCK_START,
+                        CODE_BLOCK_START,
+                        LIST_ITEM,
+                        LIST_ORDERING,
+                        SETTING_DECLARATION,
+                        BLOCK_DECLARATION,
+                        terminatingToken
+                    ]);
+
+                    //console.log(nextToken, JSON.stringify(this.tokenStream.getRemainingSourceContent()))
+
+                    if (nextToken) {
+                        return paragraph;
+                    }
+                    paragraph.children.push(new Text(" "));
+                } else {
+                    return paragraph;
+                }
+            }
+        }
+    }
+
+    parseInlineCode(): InlineCode {
+        let text = "";
+
+        while (true) {
+            let match = this.tokenStream.grabToken([INLINE_CODE_END, TEXT_CHARACTER]);
+
+            if (match.type === INLINE_CODE_END) {
+                return new InlineCode(text);
+            }
+
+            text += match.content;
+        }
+    }
+
+    parseCodeBlock(lang: string | null): CodeBlock {
+        this.tokenStream.grabOptionalToken(WHITESPACE);
+        this.tokenStream.grabToken([NEWLINE]);
+
+        let lines: string[] = [];
+
+        while (true) {
+            let end = this.tokenStream.matchTokenAndBranch<void | boolean>({
+                branches: [
+                    {
+                        tokenType: CODE_BLOCK_END,
+                        consumeToken: true,
+                        handler: () => {
+                            this.tokenStream.grabToken([NEWLINE, END_OF_FILE]);
+                            return true;
+                        },
+                    },
+                    {
+                        tokenType: CODE_BLOCK_LINE,
+                        consumeToken: true,
+                        handler: (token) => {
+                            lines.push(token.content);
+                            this.tokenStream.grabToken([NEWLINE]);
+                        },
+                    },
+                ],
+            });
+
+            if (end) {
+                return new CodeBlock(lines.join("\n"), lang);
+            }
+        }
+    }
+
+    parseList(indent: number, ordering: ListOrdering[]): List {
+        let listItems: ListItem[] = [];
+
+        while (true) {
+            let orderingToken = this.tokenStream.matchToken([LIST_ORDERING]);
+            if (orderingToken) {
+                this.tokenStream.throwSyntaxError(
+                    `List ordering directives are only allowed at the start of a list`,
+                    orderingToken,
+                    "If two separate lists were intended, insert a blank line between them."
+                );
+            }
+
+            let listItemToken = this.tokenStream.matchToken([LIST_ITEM]);
+
+            if (!listItemToken) {
+                return new List(listItems, indent, ordering);
+            }
+
+            let nextIndent = getListIndentFromListItemTokenContent(listItemToken.content);
+
+            if (nextIndent > indent) {
+                if (nextIndent > indent + 1) {
+                    this.tokenStream.throwSyntaxError(
+                        `Cannot skip indentation from level ${indent} to ${nextIndent}`,
+                        listItemToken
+                    );
+                }
+
+                let sublist = this.parseList(nextIndent, ordering);
+                listItems.push(new ListItem(indent, sublist));
+                continue;
+            } else if (nextIndent < indent) {
+                return new List(listItems, indent, ordering);
+            }
+
+            this.tokenStream.consumeToken(listItemToken);
+
+            let element = this.parseNextBlockLevelElement(null);
+            if (!element) {
+                this.tokenStream.throwSyntaxError(`Empty list item`, listItemToken);
+            }
+
+            listItems.push(new ListItem(indent, element));
+        }
+    }
+
+    parseCallout(): Callout {
+        let callout = new Callout();
+        let settingHandler = new SettingHandler(
+            [
+                {
+                    name: "title",
+                    allowDuplicates: false,
+                    requiresArgument: true,
+                    handler: () => {
+                        return this.tokenStream.grabToken([SETTING_VALUE]).content;
+                    },
+                },
+            ],
+            this.tokenStream
+        );
+
+        while (true) {
+            this.tokenStream.grabOptionalToken(WHITESPACE);
+            if (this.tokenStream.grabOptionalToken(BLOCK_END)) {
+                this.tokenStream.grabToken([WHITESPACE_INCL_NEWLINES, END_OF_FILE]);
+                callout.title = settingHandler.getSettingValue("title");
+                return callout;
+            }
+
+            let nextElement = this.parseNextBlockLevelElement(settingHandler, BLOCK_END);
+
+            if (nextElement) {
+                callout.children.push(nextElement);
+            }
+        }
+    }
+
+    parseNextBlockLevelElement(
+        settingHandler: SettingHandler | null = null,
+        terminatingToken: TokenType | null = null
+    ): Element | null {
+        this.tokenStream.grabOptionalToken(WHITESPACE);
+        return this.tokenStream.matchTokenAndBranch<Element | null>({
+            branches: [
+                {
+                    tokenType: HEADER,
+                    consumeToken: true,
+                    handler: (token) => {
+                        let headerDepth = token.content.length;
+
+                        let header = new Header(headerDepth, []);
+
+                        while (true) {
+                            let textual = this.parseNextTextualElement();
+
+                            if (textual) {
+                                header.content.push(textual);
+                            } else {
+                                break;
+                            }
+                        }
+
+                        return header;
+                    },
+                },
+                {
+                    tokenType: SETTING_DECLARATION,
+                    handler: (token) => {
+                        if (!settingHandler) {
+                            this.tokenStream.throwSyntaxError(
+                                `Settings are not valid at this location`,
+                                token
+                            );
+                        } else {
+                            settingHandler.handleSettingDeclaration();
+                        }
+
+                        return null;
+                    },
+                },
+                {
+                    tokenType: LANG_CODE_BLOCK_START,
+                    consumeToken: true,
+                    handler: (token) => {
+                        return this.parseCodeBlock(token.content.slice(3));
+                    },
+                },
+                {
+                    tokenType: CODE_BLOCK_START,
+                    consumeToken: true,
+                    handler: () => {
+                        return this.parseCodeBlock(null);
+                    },
+                },
+                {
+                    tokenType: BLOCK_MATH_START,
+                    consumeToken: true,
+                    handler: () => {
+                        return new BlockMath(
+                            this.nexMathParser
+                                .parseExpression([BLOCK_MATH_END], false)
+                                .expression.asLatex()
+                        );
+                    },
+                },
+                {
+                    tokenType: LIST_ITEM,
+                    handler: (token) => {
+                        let indent = getListIndentFromListItemTokenContent(token.content);
+
+                        if (indent > 1) {
+                            this.tokenStream.throwSyntaxError(
+                                `Cannot start list with item of indent level ${indent}`,
+                                token
+                            );
+                        }
+
+                        return this.parseList(1, []);
+                    },
+                },
+                {
+                    tokenType: LIST_ORDERING,
+                    consumeToken: true,
+                    handler: () => {
+                        this.tokenStream.grabToken([WHITESPACE]);
+                        let orderingToken = this.tokenStream.grabToken([LIST_ORDERING_VALUE]);
+                        this.tokenStream.grabToken([NEWLINE]);
+                        this.tokenStream.matchTokenStrict(
+                            [LIST_ITEM],
+                            "A list must directly follow a list ordering directive"
+                        );
+
+                        // parse ordering
+                        let orderingList: ListOrdering[] = [];
+
+                        for (let ordering of orderingToken.content.split(" ")) {
+                            let availableOrderings = [
+                                ListOrdering.Bulleted,
+                                ListOrdering.LowercaseLetter,
+                                ListOrdering.LowercaseRoman,
+                                ListOrdering.Numbered,
+                                ListOrdering.UppercaseLetter,
+                                ListOrdering.UppercaseRoman,
+                            ] as string[];
+
+                            if (!availableOrderings.includes(ordering)) {
+                                this.tokenStream.throwSyntaxError(
+                                    `Invalid list ordering option "${ordering}"`,
+                                    orderingToken,
+                                    `Valid ordering options: ${availableOrderings
+                                        .map((n) => `"${n}"`)
+                                        .join(", ")}`
+                                );
+                            }
+
+                            orderingList.push(ordering as ListOrdering);
+                        }
+
+                        return this.parseList(1, orderingList);
+                    },
+                },
+                {
+                    tokenType: BLOCK_DECLARATION,
+                    consumeToken: true,
+                    handler: (token) => {
+                        let blockName = token.content.slice(1);
+
+                        this.tokenStream.grabOptionalToken(WHITESPACE);
+                        this.tokenStream.grabToken([BLOCK_START]);
+
+                        switch (blockName) {
+                            case "callout":
+                                return this.parseCallout();
+                            default:
+                                this.tokenStream.throwSyntaxError(
+                                    `Unrecognized block type "${blockName}"`,
+                                    token
+                                );
+                        }
+                    },
+                },
+                {
+                    tokenType: TEXT_CHARACTER,
+                    handler: () => {
+                        return this.parseParagraph(terminatingToken);
+                    },
+                },
+                {
+                    tokenType: NEWLINE,
+                    consumeToken: true,
+                    handler: () => {
+                        return null;
+                    },
+                },
+            ],
+        });
     }
 
     parse(): Document {
-        let settingHandler = this.createSettingHandler([
-            {
-                name: "title",
-                allowDuplicates: false,
-                requiresArgument: true,
-                handler: SettingHandler.basicHandlerFunction,
-            },
-        ]);
         let document = new Document();
-
-        while (true) {
-            settingHandler.handle();
-
-            let token = this.tokenStream.nextToken(MODE_TOPLEVEL);
-
-            if (!token) {
-                this.unexpectedTokenError();
-            }
-
-            let element = this._parseTopLevelToken(token, MODE_TOPLEVEL);
-
-            if (element) {
-                document.children.push(element);
-            }
-
-            if (token.type === TokenType.EOF) {
-                break;
-            }
-        }
-
-        document.title = settingHandler.getSettingValue("title");
-
-        return document;
-    }
-
-    /**
-     * Add a warning at the specified location (current source location by default)
-     */
-    addWarning(message: string, location?: SourceLocation): void {
-        if (!location) {
-            this._warnings.push(new Warning(this.getCurrentSourceLocation(), message));
-        } else {
-            this._warnings.push(new Warning(location, message));
-        }
-    }
-
-    /**
-     * Expect the next token to be an end of line or end of file token. Trailing whitespace is allowed.
-     * Throw a `SyntaxError` if this is not the case.
-     */
-    private _expectEndOfStatement(): void {
-        let token = this.tokenStream.nextToken(
-            new LexingMode([TokenType.EOL, TokenType.EOF], { skipWhitespace: true })
+        let settingHandler = new SettingHandler(
+            [
+                {
+                    name: "title",
+                    allowDuplicates: false,
+                    requiresArgument: true,
+                    handler: () => {
+                        return this.tokenStream.grabToken([SETTING_VALUE]).content;
+                    },
+                },
+            ],
+            this.tokenStream
         );
 
-        if (!token) {
-            let found = this.tokenStream.getRemainingContent()[0];
-            let message = `Expected end of line or end of file, but found "${found}"`;
+        while (true) {
+            this.tokenStream.grabOptionalToken(WHITESPACE);
+            if (this.tokenStream.matchToken([END_OF_FILE])) {
+                document.title = settingHandler.getSettingValue("title");
+                return document;
+            }
 
-            this.throwSyntaxError(message);
+            let nextElement = this.parseNextBlockLevelElement(settingHandler);
+
+            if (nextElement) {
+                document.children.push(nextElement);
+            }
         }
     }
 }

@@ -1,0 +1,39 @@
+:title Improper Integrals
+
+## Definition
+
+@callout {
+    :title Definition. (Type 1 Improper Integral)
+
+    Let $a in reals$.
+
+    Let !f be a continuous function on $\[a, infty\)$.
+
+    We define *the integral of* !f *from* !a *to* !infty as
+
+    ${
+        int(a, infty)f(x)dx = lim(b->infty) [int(a, b)f(x)dx]
+    }
+
+    Furthermore, the integral is *convergent* when the limit exists, otherwise, it is *divergent*.
+}
+
+## Examples
+
+### Example 1
+@callout {
+    :title Example
+
+    Compute
+    ${
+        int(0, infty) 1/(1+x^2)dx
+    }
+}
+
+By definition,
+${
+    int(0, infty) 1/(1+x^2)dx=lim(b->infty) int(0, b) 1/(1+x^2)dx
+    =lim(b->infty)[arctan x eval(0, b)]
+    =lim(b->infty)[arctan b - arctan 0]
+    =pi/2
+}

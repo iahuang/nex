@@ -11,21 +11,36 @@ export class NexMathKeyword {
     keyword: string;
     latexTemplate: string;
     maxArguments: number;
+    minArguments: number;
+    isFunction: boolean;
+    isVerticallyLarge: boolean;
 
-    constructor(keyword: string, latexTemplate: string | null = null, maxArguments: number) {
+    constructor(keyword: string, latexTemplate: string | null = null, config: KeywordConfig) {
         this.keyword = keyword;
 
         this.latexTemplate = latexTemplate ?? "\\" + keyword;
-        this.maxArguments = maxArguments;
+        this.maxArguments = config.maxArguments ?? 0;
+        this.minArguments = config.minArguments ?? 0;
+        this.isFunction = config.isFunction ?? false;
+        this.isVerticallyLarge = config.large ?? false;
     }
 }
 
 function escapeRegex(string: string): string {
-    return string.replace(/[-\\^$*+?.()|[\]{}]/g, '\\$&');
+    return string.replace(/[-\\^$*+?.()|[\]{}]/g, "\\$&");
+}
+
+interface KeywordConfig {
+    maxArguments?: number;
+    minArguments?: number;
+    isFunction?: boolean;
+    large?: boolean;
 }
 
 export class NexMathKeywords {
     _keywords: Map<string, NexMathKeyword>;
+
+    private static _instance: NexMathKeywords | null = null;
 
     private constructor() {
         this._keywords = new Map();
@@ -34,9 +49,9 @@ export class NexMathKeywords {
     addKeyword(
         keyword: string,
         latexEquivalent: string | null = null,
-        maxArguments = 0
+        config: KeywordConfig = {}
     ): NexMathKeywords {
-        this._keywords.set(keyword, new NexMathKeyword(keyword, latexEquivalent, maxArguments));
+        this._keywords.set(keyword, new NexMathKeyword(keyword, latexEquivalent, config));
 
         return this;
     }
@@ -56,12 +71,14 @@ export class NexMathKeywords {
     }
 
     generateRegexExpression(): string {
-        return `(${Array.from(this._keywords.keys()).map(n=>escapeRegex(n)).join("|")})`
+        return `(${Array.from(this._keywords.keys())
+            .map((n) => escapeRegex(n))
+            .join("|")})`;
     }
 
-    static populated(): NexMathKeywords {
-        return (
-            new NexMathKeywords()
+    static getInstance(): NexMathKeywords {
+        if (!this._instance) {
+            this._instance = new NexMathKeywords()
                 // Greek letters (lowercase)
                 .addKeyword("alpha")
                 .addKeyword("beta")
@@ -124,6 +141,7 @@ export class NexMathKeywords {
                 .addKeyword("supset", "\\supseteq")
                 .addKeyword("ssubset", "\\subset")
                 .addKeyword("ssupset", "\\subset")
+                .addKeyword("in")
                 .addKeyword("notin")
                 .addKeyword("emptyset", "\\varnothing")
                 // Logic
@@ -141,22 +159,6 @@ export class NexMathKeywords {
                 .addKeyword("implies")
                 .addKeyword("impliedby")
                 .addKeyword("iff")
-                // Special chracters
-                .addKeyword(" ", " ")
-                .addKeyword("+", "+")
-                .addKeyword("-", "-")
-                .addKeyword(">", ">")
-                .addKeyword("<", "<")
-                .addKeyword(",", ",\\,")
-                .addKeyword("$", "\\$")
-                .addKeyword("!", "!")
-                .addKeyword("carat", "\\^")
-                .addKeyword("*", "\\cdot")
-                .addKeyword("cross", "\\times")
-                .addKeyword("slash", "/")
-                .addKeyword("=", "=")
-                .addKeyword("...", "\\cdots")
-                .addKeyword("plusminus", "\\pm")
                 // Special comparisons
                 .addKeyword(">=", "\\geq")
                 .addKeyword("<=", "\\leq")
@@ -165,6 +167,20 @@ export class NexMathKeywords {
                 .addKeyword("approx", "\\approx")
                 .addKeyword("!=", "\\neq")
                 .addKeyword("congruent", "\\cong")
+                // Special chracters
+                .addKeyword("+", "+")
+                .addKeyword("-", "-")
+                .addKeyword(">", ">")
+                .addKeyword("<", "<")
+                .addKeyword(",", ",\\,")
+                .addKeyword("!", "!")
+                .addKeyword("carat", "\\^")
+                .addKeyword("*", "\\cdot")
+                .addKeyword("cross", "\\times")
+                .addKeyword("slash", "/")
+                .addKeyword("=", "=")
+                .addKeyword("...", "\\cdots")
+                .addKeyword("plusminus", "\\pm")
                 // Trigonometric
                 .addKeyword("cos", "\\cos")
                 .addKeyword("sin", "\\sin")
@@ -200,28 +216,55 @@ export class NexMathKeywords {
                 // Misc functions and argumented notation
                 .addKeyword("log", "\\log")
                 .addKeyword("ln", "\\ln")
-                .addKeyword("sqrt", "\\sqrt{$0}", 1)
-                .addKeyword("abs", "\\left|$0\\right|", 1)
-                .addKeyword("norm", "\\left\\Vert$0\\right\\Vert", 1)
-                .addKeyword("radical", "\\sqrt[$0]{$1}", 2)
-                .addKeyword("sum", "\\sum_{$0}^{$1}", 2)
-                .addKeyword("prod", "\\prod_{$0}^{$1}", 2)
-                .addKeyword("coprod", "\\coprod_{$0}^{$1}", 2)
-                .addKeyword("int", "\\int_{$0}^{$1}", 2)
-                .addKeyword("iint", "\\iint_{$0}^{$1}", 2)
-                .addKeyword("iiint", "\\iiint_{$0}^{$1}", 2)
-                .addKeyword("lim", "\\lim_{$0}^{$1}", 2)
-                .addKeyword("max", "\\max_{$0}^{$1}", 2)
-                .addKeyword("min", "\\min_{$0}^{$1}", 2)
-                .addKeyword("inf", "\\inf_{$0}^{$1}", 2)
-                .addKeyword("sup", "\\sup_{$0}^{$1}", 2)
-                .addKeyword("sup", "\\sup_{$0}^{$1}", 2)
+                .addKeyword("sqrt", "\\sqrt{$0}", { maxArguments: 1 })
+                .addKeyword("abs", "\\left|$0\\right|", { maxArguments: 1 })
+                .addKeyword("norm", "\\left\\Vert$0\\right\\Vert", { maxArguments: 1 })
+                .addKeyword("radical", "\\sqrt[$0]{$1}", { maxArguments: 2 })
+                .addKeyword("sum", "\\displaystyle\\sum_{$0}^{$1}", {
+                    maxArguments: 2,
+                    large: true,
+                })
+                .addKeyword("prod", "\\displaystyle\\prod_{$0}^{$1}", {
+                    maxArguments: 2,
+                    large: true,
+                })
+                .addKeyword("coprod", "\\displaystyle\\coprod_{$0}^{$1}", {
+                    maxArguments: 2,
+                    large: true,
+                })
+                .addKeyword("int", "\\displaystyle\\int_{$0}^{$1}", {
+                    maxArguments: 2,
+                    large: true,
+                })
+                .addKeyword("iint", "\\displaystyle\\iint_{$0}^{$1}", {
+                    maxArguments: 2,
+                    large: true,
+                })
+                .addKeyword("iiint", "\\displaystyle\\iiint_{$0}^{$1}", {
+                    maxArguments: 2,
+                    large: true,
+                })
+                .addKeyword("lim", "\\displaystyle\\lim_{$0}^{$1}", {
+                    maxArguments: 2,
+                    large: true,
+                })
+                .addKeyword("eval", "\\Big|_{$0}^{$1}", { maxArguments: 2, large: true })
+                .addKeyword("max", "\\max")
+                .addKeyword("min", "\\min")
+                .addKeyword("inf", "\\inf")
+                .addKeyword("sup", "\\sup")
                 // Text annotations
-                .addKeyword("vec", "\\vec{$0}", 1)
-                .addKeyword("hat", "\\hat{$0}", 1)
-                .addKeyword("bar", "\\bar{$0}", 1)
-                .addKeyword("tilde", "\\tilde{$0}", 1)
-                .addKeyword("boxed", "\\boxed{$0}", 1)
-        );
+                .addKeyword("vec", "\\vec{$0}", { maxArguments: 1, minArguments: 1 })
+                .addKeyword("hat", "\\hat{$0}", { maxArguments: 1, minArguments: 1 })
+                .addKeyword("bar", "\\bar{$0}", { maxArguments: 1, minArguments: 1 })
+                .addKeyword("tilde", "\\tilde{$0}", { maxArguments: 1, minArguments: 1 })
+                .addKeyword("boxed", "\\boxed{$0}", { maxArguments: 1 })
+                // Escaped brackets + parentheses
+                .addKeyword("\\(", "(")
+                .addKeyword("\\)", ")")
+                .addKeyword("\\[", "[")
+                .addKeyword("\\]", "]");
+        }
+        return this._instance;
     }
 }

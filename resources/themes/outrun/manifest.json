@@ -1,0 +1,16 @@
+{
+    "displayName": "Outrun",
+    "description": "90's inspired dark mode theme",
+    "author": "NeX",
+    "packAssets": [
+        "Raleway-Bold.ttf",
+        "Raleway-BoldItalic.ttf",
+        "Raleway-Italic.ttf",
+        "Raleway-Regular.ttf",
+        "BebasNeue-Regular.ttf",
+        "SpaceMono-Bold.ttf",
+        "SpaceMono-BoldItalic.ttf",
+        "SpaceMono-Italic.ttf",
+        "SpaceMono-Regular.ttf"
+    ]
+}
