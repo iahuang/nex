@@ -18,7 +18,14 @@ for (let element of document.querySelectorAll(".block-math")) {
 
 for (let element of document.querySelectorAll(".calculator")) {
     let calculator = Desmos.GraphingCalculator(element, { expressions: false });
-    calculator.setExpression({ id: "graph1", latex: element.dataset.equation });
+    let blockID = element.dataset.id;
+    let equations = documentMetadata["desmos-" + blockID];
+
+    let i = 0;
+    for (let eq of equations) {
+        calculator.setExpression({ id: "graph" + i, latex: eq });
+        i += 1;
+    }
 }
 
 hljs.highlightAll();

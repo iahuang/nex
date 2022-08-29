@@ -15,9 +15,11 @@ import {
     ListItem,
     ListOrdering,
     Callout,
+    Bold,
+    DesmosElement,
 } from "./ast";
 import { NexMathParser } from "./nex_math/parser";
-import { SettingHandler } from "./setting_handler";
+import { Setting, SettingHandler } from "./setting_handler";
 import { TokenType } from "./token";
 import { TokenStream } from "./token_stream";
 import {
@@ -48,6 +50,8 @@ import {
     BLOCK_DECLARATION,
     BLOCK_START,
     BLOCK_END,
+    BOLD_START,
+    BOLD_END,
 } from "./token_types";
 
 function getListIndentFromListItemTokenContent(content: string): number {
@@ -61,6 +65,15 @@ function getListIndentFromListItemTokenContent(content: string): number {
 
     return i;
 }
+
+const TITLE_SETTING_HANDLER: Setting = {
+    name: "title",
+    allowDuplicates: false,
+    requiresArgument: true,
+    handler: (tokenStream) => {
+        return tokenStream.grabToken([SETTING_VALUE]).content;
+    },
+};
 
 export class Parser {
     source: SourceReference;
@@ -80,6 +93,7 @@ export class Parser {
             let token = this.tokenStream.matchTokenStrict([
                 NEWLINE,
                 END_OF_FILE,
+                BOLD_START,
                 ITALIC_START,
                 end,
                 INLINE_CODE_START,
@@ -97,16 +111,55 @@ export class Parser {
         }
     }
 
-    parseNextTextualElement(): Textual | null {
-        return this.tokenStream.matchTokenAndBranch<Textual | null>({
+    parseNextTextualElement(end: TokenType | null = null): Element | null {
+        return this.tokenStream.matchTokenAndBranch<Element | null>({
             branches: [
+                end !== null && {
+                    tokenType: end,
+                    handler: () => {
+                        return null;
+                    },
+                },
+                {
+                    tokenType: BOLD_START,
+                    consumeToken: true,
+                    handler: () => {
+                        let content: Element[] = [];
+
+                        while (true) {
+                            let nextElement = this.parseNextTextualElement(BOLD_END);
+
+                            if (!nextElement) {
+                                this.tokenStream.throwSyntaxError(`Invalid character`);
+                            }
+
+                            content.push(nextElement);
+
+                            if (this.tokenStream.grabOptionalToken(BOLD_END)) {
+                                return new Bold(content);
+                            }
+                        }
+                    },
+                },
                 {
                     tokenType: ITALIC_START,
-                    handler: (token) => {
-                        this.tokenStream.consumeToken(token);
-                        let text = this.parseText(ITALIC_END);
-                        this.tokenStream.grabToken([ITALIC_END]);
-                        return new Italic(text.content);
+                    consumeToken: true,
+                    handler: () => {
+                        let content: Element[] = [];
+
+                        while (true) {
+                            let nextElement = this.parseNextTextualElement(ITALIC_END);
+
+                            if (!nextElement) {
+                                this.tokenStream.throwSyntaxError(`Invalid character`);
+                            }
+
+                            content.push(nextElement);
+
+                            if (this.tokenStream.grabOptionalToken(ITALIC_END)) {
+                                return new Italic(content);
+                            }
+                        }
                     },
                 },
                 {
@@ -139,7 +192,7 @@ export class Parser {
                 {
                     tokenType: TEXT_CHARACTER,
                     handler: () => {
-                        return this.parseText();
+                        return this.parseText(end);
                     },
                 },
             ],
@@ -179,7 +232,7 @@ export class Parser {
                         LIST_ORDERING,
                         SETTING_DECLARATION,
                         BLOCK_DECLARATION,
-                        terminatingToken
+                        terminatingToken,
                     ]);
 
                     //console.log(nextToken, JSON.stringify(this.tokenStream.getRemainingSourceContent()))
@@ -290,21 +343,59 @@ export class Parser {
         }
     }
 
-    parseCallout(): Callout {
-        let callout = new Callout();
+    parseDesmos(): DesmosElement {
         let settingHandler = new SettingHandler(
             [
                 {
-                    name: "title",
-                    allowDuplicates: false,
+                    name: "equation",
+                    allowDuplicates: true,
                     requiresArgument: true,
                     handler: () => {
-                        return this.tokenStream.grabToken([SETTING_VALUE]).content;
+                        let equation = this.nexMathParser
+                            .parseExpression([NEWLINE], true)
+                            .expression.asLatex();
+
+                        return equation;
                     },
                 },
             ],
             this.tokenStream
         );
+
+        while (true) {
+            this.tokenStream.grabOptionalToken(WHITESPACE_INCL_NEWLINES);
+
+            let exit = this.tokenStream.matchTokenAndBranch<boolean>({
+                branches: [
+                    {
+                        tokenType: BLOCK_END,
+                        consumeToken: true,
+                        handler: () => {
+                            this.tokenStream.grabToken([WHITESPACE_INCL_NEWLINES, END_OF_FILE]);
+
+                            return true;
+                        },
+                    },
+                    {
+                        tokenType: SETTING_DECLARATION,
+                        handler: () => {
+                            settingHandler.handleSettingDeclaration();
+
+                            return false;
+                        },
+                    },
+                ],
+            });
+
+            if (exit) {
+                return new DesmosElement(settingHandler.getSettingValues("equation"));
+            }
+        }
+    }
+
+    parseCallout(): Callout {
+        let callout = new Callout();
+        let settingHandler = new SettingHandler([TITLE_SETTING_HANDLER], this.tokenStream);
 
         while (true) {
             this.tokenStream.grabOptionalToken(WHITESPACE);
@@ -338,7 +429,7 @@ export class Parser {
                         let header = new Header(headerDepth, []);
 
                         while (true) {
-                            let textual = this.parseNextTextualElement();
+                            let textual = this.parseNextTextualElement(ITALIC_END);
 
                             if (textual) {
                                 header.content.push(textual);
@@ -458,6 +549,8 @@ export class Parser {
                         switch (blockName) {
                             case "callout":
                                 return this.parseCallout();
+                            case "desmos":
+                                return this.parseDesmos();
                             default:
                                 this.tokenStream.throwSyntaxError(
                                     `Unrecognized block type "${blockName}"`,
@@ -485,19 +578,7 @@ export class Parser {
 
     parse(): Document {
         let document = new Document();
-        let settingHandler = new SettingHandler(
-            [
-                {
-                    name: "title",
-                    allowDuplicates: false,
-                    requiresArgument: true,
-                    handler: () => {
-                        return this.tokenStream.grabToken([SETTING_VALUE]).content;
-                    },
-                },
-            ],
-            this.tokenStream
-        );
+        let settingHandler = new SettingHandler([TITLE_SETTING_HANDLER], this.tokenStream);
 
         while (true) {
             this.tokenStream.grabOptionalToken(WHITESPACE);

@@ -21,11 +21,11 @@ export class Header extends Element {
      * etc.
      */
     depth: number;
-    content: Textual[];
+    content: Element[];
 
     elementName = "header";
 
-    constructor(depth: number, content: Textual[]) {
+    constructor(depth: number, content: Element[]) {
         super();
 
         this.depth = depth;
@@ -106,8 +106,25 @@ export abstract class Textual extends Element {
 export class Text extends Textual {
     elementName = "text";
 }
-export class Italic extends Textual {
+export class Italic extends Element {
     elementName = "italic";
+    children: Element[];
+
+    constructor(children: Element[]) {
+        super();
+
+        this.children = children;
+    }
+}
+export class Bold extends Element {
+    elementName = "bold";
+    children: Element[];
+
+    constructor(children: Element[]) {
+        super();
+
+        this.children = children;
+    }
 }
 export class InlineMath extends Textual {
     elementName = "inlineMath";
@@ -117,14 +134,14 @@ export class InlineCode extends Textual {
 }
 
 export class DesmosElement extends Element {
-    latexEquation: string;
+    equations: string[];
 
     elementName = "desmos";
 
-    constructor(latexExpression: string) {
+    constructor(equations: string[]) {
         super();
 
-        this.latexEquation = latexExpression;
+        this.equations = equations;
     }
 }
 

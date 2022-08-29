@@ -14,6 +14,9 @@ export const SETTING_VALUE = new TokenType("setting value", { regex: /^.+/g });
 
 export const ITALIC_START = new TokenType("italic start", { regex: /^\*(?=\S.{0,}\S\*)/g });
 export const ITALIC_END = new TokenType("italic end", { pattern: "*" });
+export const BOLD_START = new TokenType("italic start", { regex: /^\*\*(?=\S.{0,}\S\*\*)/g });
+export const BOLD_END = new TokenType("italic end", { pattern: "**" });
+
 export const HEADER = new TokenType("header declaration", { regex: /^#{1,4}(?= \S)/g });
 export const HR = new TokenType("horizontal line", { regex: /^---$/gm });
 

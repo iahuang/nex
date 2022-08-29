@@ -3,7 +3,8 @@ import { Document } from "../parser/ast";
 import { resolveResourcePath } from "../resources";
 import { ThemeData } from "../theme";
 import { FsUtil } from "../util";
-import { elementAsHTMLNode } from "./element_templates";
+import { ElementBuilder } from "./element_templates";
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { createElement, HTMLNode, HTMLVerbatim } from "./jsx";
 
@@ -96,6 +97,7 @@ export class DocumentHTMLGenerator {
      */
     async generateStandaloneHTML(document: Document, themeData: ThemeData): Promise<string> {
         let launchScript = FsUtil.readText(resolveResourcePath("document_renderer.js"));
+        let elementBuilder = new ElementBuilder();
 
         let htmlRoot: HTMLNode = (
             <html>
@@ -108,8 +110,16 @@ export class DocumentHTMLGenerator {
                         </div>
                     </noscript>
 
-                    {elementAsHTMLNode(document)}
+                    {elementBuilder.elementAsHTMLNode(document)}
                 </body>
+                {
+                    new HTMLVerbatim(
+                        "<script>" +
+                            "window.documentMetadata=" +
+                            elementBuilder.metadata.asJSONString() +
+                            "</script>"
+                    )
+                }
                 {new HTMLVerbatim("<script>" + launchScript + "</script>")}
             </html>
         );

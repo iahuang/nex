@@ -18,3 +18,14 @@ body {
     box-sizing: border-box;
     padding: 20px;
 }
+
+.calculator {
+    width: 640px;
+    height: 480px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.dcg-pillbox-container {
+    visibility: hidden;
+}

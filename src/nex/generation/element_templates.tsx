@@ -1,7 +1,9 @@
 import {
     BlockMath,
+    Bold,
     Callout,
     CodeBlock,
+    DesmosElement,
     Document,
     Element,
     Header,
@@ -13,25 +15,26 @@ import {
     Paragraph,
     Text,
 } from "../parser/ast";
+import { DocumentMetadata } from "./document_metadata";
 import { createElement, HTMLNode, TextNode } from "./jsx";
 
 interface ElementHTMLTemplate<T extends Element> {
     elementName: string;
-    generator: (element: T) => HTMLNode;
+    generator: (element: T, elementBuilder: ElementBuilder) => HTMLNode;
 }
 
 // TEMPLATES
 
 const TEMPLATE_HEADER: ElementHTMLTemplate<Header> = {
     elementName: "header",
-    generator: (header) => {
+    generator: (header, elementBuilder) => {
         // since header.depth only goes up to 4, we don't need to validate anything
         let tagName = "h" + header.depth;
 
         return createElement(
             tagName,
             {},
-            ...header.content.map((child) => elementAsHTMLNode(child))
+            ...header.content.map((child) => elementBuilder.elementAsHTMLNode(child))
         );
     },
 };
@@ -72,8 +75,8 @@ const TEMPLATE_INLINE_MATH: ElementHTMLTemplate<InlineMath> = {
 
 const TEMPLATE_PARAGRAPH: ElementHTMLTemplate<Paragraph> = {
     elementName: "paragraph",
-    generator: (p) => {
-        return <p>{p.children.map((c) => elementAsHTMLNode(c))}</p>;
+    generator: (p, elementBuilder) => {
+        return <p>{p.children.map((c) => elementBuilder.elementAsHTMLNode(c))}</p>;
     },
 };
 
@@ -86,18 +89,25 @@ const TEMPLATE_TEXT: ElementHTMLTemplate<Text> = {
 
 const TEMPLATE_ITALIC: ElementHTMLTemplate<Italic> = {
     elementName: "italic",
-    generator: (i) => {
-        return <em>{i.content}</em>;
+    generator: (i, elementBuilder) => {
+        return <em>{i.children.map((c) => elementBuilder.elementAsHTMLNode(c))}</em>;
+    },
+};
+
+const TEMPLATE_BOLD: ElementHTMLTemplate<Bold> = {
+    elementName: "bold",
+    generator: (i, elementBuilder) => {
+        return <b>{i.children.map((c) => elementBuilder.elementAsHTMLNode(c))}</b>;
     },
 };
 
 const TEMPLATE_DOCUMENT: ElementHTMLTemplate<Document> = {
     elementName: "document",
-    generator: (document) => {
+    generator: (document, elementBuilder) => {
         return (
             <div class="document">
                 <div class="document-title">{document.title && document.title}</div>
-                {document.children.map((c) => elementAsHTMLNode(c))}
+                {document.children.map((c) => elementBuilder.elementAsHTMLNode(c))}
             </div>
         );
     },
@@ -105,7 +115,7 @@ const TEMPLATE_DOCUMENT: ElementHTMLTemplate<Document> = {
 
 const TEMPLATE_LIST: ElementHTMLTemplate<List> = {
     elementName: "list",
-    generator: (list) => {
+    generator: (list, elementBuilder) => {
         let ordering = list.ordering[list.indent - 1] ?? ListOrdering.Bulleted;
 
         if (ordering === ListOrdering.Bulleted) {
@@ -113,9 +123,9 @@ const TEMPLATE_LIST: ElementHTMLTemplate<List> = {
                 <ul style="list-style-type: disc;">
                     {list.items.map((item) => {
                         if (item.content.elementName === "list") {
-                            return elementAsHTMLNode(item.content);
+                            return elementBuilder.elementAsHTMLNode(item.content);
                         } else {
-                            return <li>{elementAsHTMLNode(item.content)}</li>;
+                            return <li>{elementBuilder.elementAsHTMLNode(item.content)}</li>;
                         }
                     })}
                 </ul>
@@ -125,9 +135,9 @@ const TEMPLATE_LIST: ElementHTMLTemplate<List> = {
                 <ol type={ordering}>
                     {list.items.map((item) => {
                         if (item.content.elementName === "list") {
-                            return elementAsHTMLNode(item.content);
+                            return elementBuilder.elementAsHTMLNode(item.content);
                         } else {
-                            return <li>{elementAsHTMLNode(item.content)}</li>;
+                            return <li>{elementBuilder.elementAsHTMLNode(item.content)}</li>;
                         }
                     })}
                 </ol>
@@ -138,13 +148,26 @@ const TEMPLATE_LIST: ElementHTMLTemplate<List> = {
 
 const TEMPLATE_CALLOUT: ElementHTMLTemplate<Callout> = {
     elementName: "callout",
-    generator: (callout) => {
+    generator: (callout, elementBuilder) => {
         return (
             <div class="callout">
                 {callout.title && <div class="callout-title">{callout.title}</div>}
-                <div class="callout-body">{callout.children.map((c) => elementAsHTMLNode(c))}</div>
+                <div class="callout-body">
+                    {callout.children.map((c) => elementBuilder.elementAsHTMLNode(c))}
+                </div>
             </div>
         );
+    },
+};
+
+const TEMPLATE_DESMOS: ElementHTMLTemplate<DesmosElement> = {
+    elementName: "desmos",
+    generator: (desmos, elementBuilder) => {
+        let blockID = elementBuilder.newDesmosBlockID();
+
+        elementBuilder.metadata.setKey("desmos-" + blockID, desmos.equations);
+
+        return <div class="calculator" data-id={blockID}></div>;
     },
 };
 
@@ -159,9 +182,11 @@ const TEMPLATES = [
     TEMPLATE_PARAGRAPH,
     TEMPLATE_TEXT,
     TEMPLATE_ITALIC,
+    TEMPLATE_BOLD,
     TEMPLATE_LIST,
     TEMPLATE_DOCUMENT,
-    TEMPLATE_CALLOUT
+    TEMPLATE_CALLOUT,
+    TEMPLATE_DESMOS
 ];
 
 const TEMPLATE_MAP: { [k: string]: ElementHTMLTemplate<Element> } = {};
@@ -170,12 +195,29 @@ for (let template of TEMPLATES) {
     TEMPLATE_MAP[template.elementName] = template as ElementHTMLTemplate<Element>;
 }
 
-export function elementAsHTMLNode(element: Element): HTMLNode {
-    let template = TEMPLATE_MAP[element.elementName];
+export class ElementBuilder {
+    metadata: DocumentMetadata;
+    private _desmosBlockNextID: number;
 
-    if (!template) {
-        throw new Error(`No template exists for element of type "${element.elementName}"`);
+    constructor() {
+        this.metadata = new DocumentMetadata();
+        this._desmosBlockNextID = 0;
     }
 
-    return template.generator(element);
+    newDesmosBlockID(): string {
+        let id = this._desmosBlockNextID;
+        this._desmosBlockNextID += 1;
+
+        return id.toString();
+    }
+
+    elementAsHTMLNode(element: Element): HTMLNode {
+        let template = TEMPLATE_MAP[element.elementName];
+
+        if (!template) {
+            throw new Error(`No template exists for element of type "${element.elementName}"`);
+        }
+
+        return template.generator(element, this);
+    }
 }

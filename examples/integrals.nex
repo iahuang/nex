@@ -9,7 +9,7 @@
 
     Let !f be a continuous function on $\[a, infty\)$.
 
-    We define *the integral of* !f *from* !a *to* !infty as
+    We define **the integral of !f from !a to !infty** as
 
     ${
         int(a, infty)f(x)dx = lim(b->infty) [int(a, b)f(x)dx]
@@ -21,6 +21,7 @@
 ## Examples
 
 ### Example 1
+
 @callout {
     :title Example
 
@@ -28,7 +29,14 @@
     ${
         int(0, infty) 1/(1+x^2)dx
     }
+
+    Below is a graph of this function:
+    @desmos {
+        :equation 1/(1+x^2)
+    }
 }
+
+### Solution
 
 By definition,
 ${

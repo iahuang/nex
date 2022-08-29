@@ -5,6 +5,7 @@ import { NexMathKeyword } from "./keywords";
  */
 export abstract class MathNode {
     abstract asLatex(): string;
+    
     /**
      * Return `true` if the content contained in this node is vertically large, i.e.
      * will require the brackets to be scalled via `\left` and `\right` such as in the case

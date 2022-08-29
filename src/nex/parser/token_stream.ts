@@ -2,12 +2,14 @@ import { SourceReference, SourceLocation } from "../source";
 import { NexSyntaxError, userFriendlyCharacterRepresentation } from "./errors";
 import { TokenType, Token } from "./token";
 
+interface Branch<T> {
+    tokenType: TokenType;
+    consumeToken?: true;
+    handler: (token: Token) => T;
+}
+
 interface BranchOptions<T> {
-    branches: {
-        tokenType: TokenType;
-        consumeToken?: true;
-        handler: (token: Token) => T;
-    }[];
+    branches: (false | Branch<T>)[];
     default?: () => T;
 }
 
@@ -128,12 +130,18 @@ export class TokenStream {
     }
 
     matchTokenAndBranch<T>(opts: BranchOptions<T>): T {
-        let tokenTypes = opts.branches.map((branch) => branch.tokenType);
+        let tokenTypes = (opts.branches.filter((b) => Boolean(b)) as Branch<T>[]).map(
+            (branch) => branch.tokenType
+        );
 
         let match = this.matchToken(tokenTypes);
 
         if (match) {
             for (let branch of opts.branches) {
+                if (!branch) {
+                    continue;
+                }
+
                 if (branch.tokenType === match.type) {
                     if (branch.consumeToken) {
                         this.consumeToken(match);

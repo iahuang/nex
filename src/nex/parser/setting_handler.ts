@@ -1,11 +1,12 @@
 import { TokenStream } from "./token_stream";
-import { SETTING_DECLARATION, SETTING_NAME } from "./token_types";
+import { NEWLINE, SETTING_DECLARATION, SETTING_NAME } from "./token_types";
 
-interface Setting {
+export interface Setting {
     name: string;
     allowDuplicates: boolean;
     requiresArgument: boolean;
-    handler: () => string;
+
+    handler: (tokenStream: TokenStream) => string;
 }
 
 export class SettingHandler {
@@ -50,7 +51,7 @@ export class SettingHandler {
 
     //     return "";
     // }
-    
+
     handleSettingDeclaration(): void {
         this.tokenStream.grabToken([SETTING_DECLARATION]);
 
@@ -66,7 +67,7 @@ export class SettingHandler {
             );
         }
 
-        let settingContent = setting.handler();
+        let settingContent = setting.handler(this.tokenStream);
 
         // If a setting of this name already exists, confirm that duplicates are allowed
         if (this._settings.get(settingName)!.length > 0 && !setting.allowDuplicates) {
