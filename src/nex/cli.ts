@@ -1,5 +1,6 @@
 import chalk from "chalk";
-import { CLISchema, Option, parseArgv } from "./argv_parser";
+import { CLISchema, Option, parseArgv } from "./cli/argv_parser";
+import { displaySyntaxError, printHelpMessage } from "./cli/cli_utils";
 import { DocumentHTMLGenerator } from "./generation/generation";
 import { panic } from "./logging";
 import { astDump } from "./parser/ast";
@@ -9,89 +10,6 @@ import { resolveResourcePath } from "./resources";
 import { SourceReference } from "./source";
 import { ThemeManager } from "./theme";
 import { FsUtil, StringBuffer } from "./util";
-
-function _makeOptionString(option: Option): string {
-    let first = option.shortcut ? `--${option.name}, -${option.shortcut}` : `--${option.name}`;
-
-    if (option.requiresArgument) {
-        return `${first} [${option.argumentDescription ?? "value"}]`;
-    }
-
-    return first;
-}
-
-function _makeColoredOptionString(option: Option): string {
-    let first = option.shortcut ? `--${option.name}, -${option.shortcut}` : `--${option.name}`;
-
-    if (option.requiresArgument) {
-        return (
-            `${chalk.magentaBright(first)}` +
-            chalk.italic(
-                chalk.dim(chalk.magentaBright(` [${option.argumentDescription ?? "value"}]`))
-            )
-        );
-    }
-
-    return chalk.magentaBright(first);
-}
-
-function printHelpMessage(schema: CLISchema): void {
-    let output = new StringBuffer();
-
-    output.writeln("Usage:", "nex", chalk.cyanBright("[mode]"), chalk.magentaBright("[options]"));
-    output.writeln();
-
-    let optionStrings: string[] = [];
-
-    for (let mode of schema.modes) {
-        optionStrings.push(...mode.options.map((opt) => _makeOptionString(opt)));
-    }
-
-    let maxOptionStringLength = Math.max(...optionStrings.map((s) => s.length));
-
-    output.writeln("Modes:");
-
-    const indentMode = " ".repeat(4);
-    const indentOption = " ".repeat(8);
-
-    for (let mode of schema.modes) {
-        output.writeln(indentMode + chalk.bold(mode.name.toUpperCase()) + "\n");
-        output.writeln(indentMode + mode.description);
-        output.write(indentMode + chalk.dim("Usage:"), "nex", chalk.cyanBright(mode.name));
-
-        if (mode.options.length > 0) {
-            output.write(" " + chalk.magentaBright("[options]"));
-        }
-
-        if (mode.requiresInput) {
-            output.write(" " + chalk.greenBright(`[${mode.inputDescription}]`));
-        }
-
-        output.write("\n");
-
-        for (let option of mode.options) {
-            let optionString = _makeOptionString(option);
-            output.write(indentOption + " ".repeat(maxOptionStringLength - optionString.length));
-            output.write(_makeColoredOptionString(option));
-            output.write("  ");
-
-            let i = 0;
-            for (let line of (option.description ?? "(No description provided)").split("\n")) {
-                if (i > 0) {
-                    output.write(indentOption + " ".repeat(maxOptionStringLength) + "  ");
-                }
-
-                output.writeln(line);
-
-                i += 1;
-            }
-        }
-
-        output.writeln("\n");
-    }
-
-    process.stdout.write(output.read());
-}
 
 export function runCLI(argv: string[]): void {
     let themeManager = new ThemeManager(resolveResourcePath("themes"));
@@ -132,6 +50,22 @@ export function runCLI(argv: string[]): void {
                         name: "debug",
                         description: "Output additional information for debug purposes",
                         argumentDescription: "mode",
+                        requiresArgument: true,
+                        allowDuplicates: false,
+                    },
+                ],
+            },
+            {
+                name: "build-notebook",
+                description: "Builds the provided NeX notebook folder into a standalone HTML file",
+                requiresInput: true,
+                inputDescription: "notebook path",
+                options: [
+                    {
+                        name: "out",
+                        shortcut: "o",
+                        description: "Specify output HTML path",
+                        argumentDescription: "path",
                         requiresArgument: true,
                         allowDuplicates: false,
                     },
@@ -189,6 +123,10 @@ export function runCLI(argv: string[]): void {
             });
             break;
         }
+        case "build-notebook": {
+            let defaultOutputFile = FsUtil.entityName(parseResult.input!) + ".html";
+            break;
+        }
         case "list-themes":
             listThemes(themeManager);
             break;
@@ -230,74 +168,6 @@ function listThemes(themeManager: ThemeManager): void {
     }
 
     process.stdout.write(output.read());
-}
-
-function displaySourcePreview(
-    source: SourceReference,
-    line: number,
-    lookback: number
-): {
-    output: string;
-    marginWidth: number;
-} {
-    let output = new StringBuffer();
-    let lines = source.getContent().split("\n");
-    let lineNumberMaxWidth = line.toString().length;
-
-    for (let lineNumber = Math.max(1, line - lookback); lineNumber <= line; lineNumber++) {
-        let lineContent = lines[lineNumber - 1];
-        output.write(
-            chalk.dim(
-                chalk.bold(
-                    " ".repeat(lineNumberMaxWidth - lineNumber.toString().length) + lineNumber
-                )
-            )
-        );
-        output.write(chalk.dim("| "));
-        output.writeln(lineContent);
-    }
-
-    return {
-        output: output.read(),
-        marginWidth: lineNumberMaxWidth + 2,
-    };
-}
-
-function displaySyntaxError(error: NexSyntaxError): void {
-    let output = new StringBuffer();
-
-    output.writeln(
-        "at",
-        chalk.cyanBright(
-            (error.location.source.getPath() ?? "<anonymous>") +
-                ":" +
-                error.location.line +
-                ":" +
-                error.location.col
-        )
-    );
-    output.writeln(chalk.bold(chalk.redBright("error:"), error.message));
-    let sourcePreview = displaySourcePreview(error.location.source, error.location.line, 4);
-    output.write(sourcePreview.output);
-
-    if (error.offendingToken) {
-        output.writeln(
-            chalk.redBright(
-                " ".repeat(error.location.col - 1 + sourcePreview.marginWidth) +
-                    "~".repeat(error.offendingToken.content.length)
-            )
-        );
-    } else {
-        output.writeln(
-            chalk.redBright(" ".repeat(error.location.col - 1 + sourcePreview.marginWidth) + "^")
-        );
-    }
-
-    if (error.note) {
-        output.writeln(chalk.bold(chalk.yellowBright("note: ")) + error.note);
-    }
-
-    process.stderr.write(output.read());
 }
 
 async function build(args: {
