@@ -1,7 +1,9 @@
 import { panic, logWarning } from "./logging";
+import { resolveResourcePath } from "./resources";
 import { SchemaType } from "./schema";
 import { FsUtil } from "./util";
 
+export const DEFAULT_THEME = "latex";
 
 export class ThemeData {
     manifest: ThemeManifest;
@@ -64,7 +66,10 @@ const manifestSchema = SchemaType.struct<ThemeManifest>({
 export class ThemeManager {
     themesDirectory: string;
 
-    constructor(themesDirectory: string) {
+    /**
+     * By default, `themesDirectory` is set to `<resources directory>/themes`
+     */
+    constructor(themesDirectory: string = resolveResourcePath("themes")) {
         this.themesDirectory = themesDirectory;
     }
 
@@ -141,6 +146,17 @@ export class ThemeManager {
         }
 
         return manifestData;
+    }
+
+    /**
+     * Return `true` if the theme folder corresponding to the provided name exists.
+     *
+     * Does not validate whether the theme folder represents a valid theme.
+     */
+    doesThemeExist(themeName: string): boolean {
+        let themePath = FsUtil.joinPath(this.themesDirectory, themeName);
+
+        return FsUtil.exists(themePath);
     }
 
     /**

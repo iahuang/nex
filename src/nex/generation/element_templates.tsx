@@ -6,6 +6,7 @@ import {
     DesmosElement,
     Document,
     Element,
+    Group,
     Header,
     InlineCode,
     InlineMath,
@@ -13,6 +14,8 @@ import {
     List,
     ListOrdering,
     Paragraph,
+    Row,
+    Table,
     Text,
 } from "../parser/ast";
 import { DocumentMetadata } from "./document_metadata";
@@ -160,6 +163,37 @@ const TEMPLATE_CALLOUT: ElementHTMLTemplate<Callout> = {
     },
 };
 
+const TEMPLATE_GROUP: ElementHTMLTemplate<Group> = {
+    elementName: "group",
+    generator: (group, elementBuilder) => {
+        return (
+            <div class="group">
+                {group.children.map((c) => elementBuilder.elementAsHTMLNode(c))}
+            </div>
+        );
+    },
+};
+
+const TEMPLATE_TABLE: ElementHTMLTemplate<Table> = {
+    elementName: "table",
+    generator: (table, elementBuilder) => {
+        return <table>{table.rows.map((c) => elementBuilder.elementAsHTMLNode(c))}</table>;
+    },
+};
+
+const TEMPLATE_ROW: ElementHTMLTemplate<Row> = {
+    elementName: "row",
+    generator: (table, elementBuilder) => {
+        return (
+            <tr>
+                {table.cells.map((c) => (
+                    <td>{elementBuilder.elementAsHTMLNode(c)}</td>
+                ))}
+            </tr>
+        );
+    },
+};
+
 const TEMPLATE_DESMOS: ElementHTMLTemplate<DesmosElement> = {
     elementName: "desmos",
     generator: (desmos, elementBuilder) => {
@@ -186,7 +220,10 @@ const TEMPLATES = [
     TEMPLATE_LIST,
     TEMPLATE_DOCUMENT,
     TEMPLATE_CALLOUT,
-    TEMPLATE_DESMOS
+    TEMPLATE_TABLE,
+    TEMPLATE_ROW,
+    TEMPLATE_GROUP,
+    TEMPLATE_DESMOS,
 ];
 
 const TEMPLATE_MAP: { [k: string]: ElementHTMLTemplate<Element> } = {};

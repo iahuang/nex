@@ -130,11 +130,11 @@ export class NexMathKeywords {
                 .addKeyword("Psi")
                 .addKeyword("Omega")
                 // Sets
-                .addKeyword("naturals", "\\mathbb{N}")
-                .addKeyword("integers", "\\mathbb{Z}")
-                .addKeyword("complex", "\\mathbb{C}")
-                .addKeyword("rationals", "\\mathbb{Q}")
-                .addKeyword("reals", "\\mathbb{R}")
+                .addKeyword("Naturals", "\\mathbb{N}")
+                .addKeyword("Integers", "\\mathbb{Z}")
+                .addKeyword("Complex", "\\mathbb{C}")
+                .addKeyword("Rationals", "\\mathbb{Q}")
+                .addKeyword("Reals", "\\mathbb{R}")
                 .addKeyword("forall")
                 .addKeyword("exists")
                 .addKeyword("subset", "\\subseteq")
@@ -144,10 +144,12 @@ export class NexMathKeywords {
                 .addKeyword("in")
                 .addKeyword("notin")
                 .addKeyword("emptyset", "\\varnothing")
+                .addKeyword("union", "\\cup")
+                .addKeyword("intersection", "\\cap")
                 // Logic
-                .addKeyword("NOT", "\\neg")
-                .addKeyword("AND", "\\land")
-                .addKeyword("OR", "\\lor")
+                .addKeyword("not", "\\neg")
+                .addKeyword("and", "\\land")
+                .addKeyword("or", "\\lor")
                 // Arrows
                 .addKeyword("<-->", "\\longleftrightarrow")
                 .addKeyword("-->", "\\longrightarrow")
@@ -157,6 +159,7 @@ export class NexMathKeywords {
                 .addKeyword("gets")
                 .addKeyword("<-", "\\gets")
                 .addKeyword("implies")
+                .addKeyword("=>", "\\implies")
                 .addKeyword("impliedby")
                 .addKeyword("iff")
                 // Special comparisons
@@ -173,13 +176,16 @@ export class NexMathKeywords {
                 .addKeyword(">", ">")
                 .addKeyword("<", "<")
                 .addKeyword(",", ",\\,")
+                .addKeyword("'", "'")
+                .addKeyword(":", ":")
                 .addKeyword("!", "!")
                 .addKeyword("carat", "\\^")
                 .addKeyword("*", "\\cdot")
                 .addKeyword("cross", "\\times")
+                .addKeyword("star", "*")
                 .addKeyword("slash", "/")
                 .addKeyword("=", "=")
-                .addKeyword("...", "\\cdots")
+                .addKeyword("...", "\\dots")
                 .addKeyword("plusminus", "\\pm")
                 // Trigonometric
                 .addKeyword("cos", "\\cos")
@@ -245,6 +251,14 @@ export class NexMathKeywords {
                     large: true,
                 })
                 .addKeyword("lim", "\\displaystyle\\lim_{$0}^{$1}", {
+                    maxArguments: 2,
+                    large: true,
+                })
+                .addKeyword("bigunion", "\\displaystyle\\bigcup_{$0}^{$1}", {
+                    maxArguments: 2,
+                    large: true,
+                })
+                .addKeyword("bigintersection", "\\displaystyle\\bigcap_{$0}^{$1}", {
                     maxArguments: 2,
                     large: true,
                 })

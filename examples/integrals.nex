@@ -11,7 +11,7 @@
 
     We define **the integral of !f from !a to !infty** as
 
-    ${
+    %{
         int(a, infty)f(x)dx = lim(b->infty) [int(a, b)f(x)dx]
     }
 
@@ -26,8 +26,8 @@
     :title Example
 
     Compute
-    ${
-        int(0, infty) 1/(1+x^2)dx
+    %{
+        int(0, infty) 1/(1+x^2)dx 
     }
 
     Below is a graph of this function:
@@ -39,7 +39,7 @@
 ### Solution
 
 By definition,
-${
+%{
     int(0, infty) 1/(1+x^2)dx=lim(b->infty) int(0, b) 1/(1+x^2)dx
     =lim(b->infty)[arctan x eval(0, b)]
     =lim(b->infty)[arctan b - arctan 0]

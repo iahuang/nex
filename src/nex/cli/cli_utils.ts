@@ -1,20 +1,14 @@
 import chalk from "chalk";
 import { NexSyntaxError } from "../parser/errors";
 import { SourceReference } from "../source";
-import { StringBuffer } from "../util";
+import { StringBuffer, stripAnsi } from "../util";
 import { Option, CLISchema } from "./argv_parser";
 
+/**
+ * Given an `Option` object, return a string such as
+ * `"--output, -o [path]"` with ANSI coloring.
+ */
 function _makeOptionString(option: Option): string {
-    let first = option.shortcut ? `--${option.name}, -${option.shortcut}` : `--${option.name}`;
-
-    if (option.requiresArgument) {
-        return `${first} [${option.argumentDescription ?? "value"}]`;
-    }
-
-    return first;
-}
-
-function _makeColoredOptionString(option: Option): string {
     let first = option.shortcut ? `--${option.name}, -${option.shortcut}` : `--${option.name}`;
 
     if (option.requiresArgument) {
@@ -29,6 +23,9 @@ function _makeColoredOptionString(option: Option): string {
     return chalk.magentaBright(first);
 }
 
+/**
+ * Print CLI help message to stdout; invoked by `nex help`.
+ */
 export function printHelpMessage(schema: CLISchema): void {
     let output = new StringBuffer();
 
@@ -38,7 +35,7 @@ export function printHelpMessage(schema: CLISchema): void {
     let optionStrings: string[] = [];
 
     for (let mode of schema.modes) {
-        optionStrings.push(...mode.options.map((opt) => _makeOptionString(opt)));
+        optionStrings.push(...mode.options.map((opt) => stripAnsi(_makeOptionString(opt))));
     }
 
     let maxOptionStringLength = Math.max(...optionStrings.map((s) => s.length));
@@ -65,8 +62,10 @@ export function printHelpMessage(schema: CLISchema): void {
 
         for (let option of mode.options) {
             let optionString = _makeOptionString(option);
-            output.write(indentOption + " ".repeat(maxOptionStringLength - optionString.length));
-            output.write(_makeColoredOptionString(option));
+            output.write(
+                indentOption + " ".repeat(maxOptionStringLength - stripAnsi(optionString).length)
+            );
+            output.write(_makeOptionString(option));
             output.write("  ");
 
             let i = 0;
@@ -87,7 +86,16 @@ export function printHelpMessage(schema: CLISchema): void {
     process.stdout.write(output.read());
 }
 
-function displaySourcePreview(
+/**
+ * Given a location in a NeX source, print a preview of that general part of the source, e.g.
+ * ```plain
+ *  9|
+ * 10| abcdefg {
+ * 11|     1234567890
+ * 12| }
+ * ```
+ */
+function printSourcePreview(
     source: SourceReference,
     line: number,
     lookback: number
@@ -118,7 +126,11 @@ function displaySourcePreview(
     };
 }
 
-export function displaySyntaxError(error: NexSyntaxError): void {
+/**
+ * Format, color, and return a string representation of a NeX syntax error
+ * to be printed to the console
+ */
+export function generateSyntaxErrorPrintout(error: NexSyntaxError): string {
     let output = new StringBuffer();
 
     output.writeln(
@@ -131,8 +143,9 @@ export function displaySyntaxError(error: NexSyntaxError): void {
                 error.location.col
         )
     );
+
     output.writeln(chalk.bold(chalk.redBright("error:"), error.message));
-    let sourcePreview = displaySourcePreview(error.location.source, error.location.line, 4);
+    let sourcePreview = printSourcePreview(error.location.source, error.location.line, 4);
     output.write(sourcePreview.output);
 
     if (error.offendingToken) {
@@ -152,5 +165,5 @@ export function displaySyntaxError(error: NexSyntaxError): void {
         output.writeln(chalk.bold(chalk.yellowBright("note: ")) + error.note);
     }
 
-    process.stderr.write(output.read());
+    return output.read();
 }

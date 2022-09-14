@@ -1,6 +1,7 @@
 import fs from "fs";
 import mime from "mime-types";
-import { join, parse, resolve } from "path";
+import path, { join, parse, resolve } from "path";
+import os from "os";
 import crypto from "crypto";
 
 export function md5Hash(data: string | Buffer): string {
@@ -263,8 +264,50 @@ export namespace FsUtil {
             fs.unlinkSync(path);
         }
     }
+
+    export function isDirectory(path: string): boolean {
+        return fs.lstatSync(path).isDirectory();
+    }
+
+    export function dirname(filePath: string): string {
+        return path.dirname(filePath);
+    }
+
+    export function getHomeDirectory(): string {
+        return os.homedir();
+    }
+
+    export function getFileExtension(filePath: string): string | null {
+        return path.extname(entityName(filePath)) || null;
+    }
+
+    export function isAccessible(filePath: string): boolean {
+        try {
+            fs.accessSync(filePath, fs.constants.R_OK);
+            return true;
+        } catch {
+            return false;
+        }
+    }
 }
 
 export function createDataURL(data: Buffer, mimeType: string): string {
     return "data:" + mimeType + ";base64," + data.toString("base64");
+}
+
+export function ansiRegex({ onlyFirst = false } = {}): RegExp {
+    const pattern = [
+        "[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)",
+        "(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]))",
+    ].join("|");
+
+    return new RegExp(pattern, onlyFirst ? undefined : "g");
+}
+
+export function stripAnsi(string: string): string {
+    if (typeof string !== "string") {
+        throw new TypeError(`Expected a \`string\`, got \`${typeof string}\``);
+    }
+
+    return string.replace(ansiRegex(), "");
 }

@@ -180,9 +180,9 @@ export class NexMathParser {
                 {
                     tokenType: NM_TEXT_START,
                     consumeToken: true,
-                    handler: ()=>{
+                    handler: () => {
                         return this.parseText();
-                    }
+                    },
                 },
                 {
                     tokenType: NM_PAREN_LEFT,
@@ -305,6 +305,7 @@ export class NexMathParser {
                     return new Cases(cases);
                 }
             } else {
+                cases.push(new Case(nextCase.expression, null));
                 return new Cases(cases);
             }
         }
@@ -377,8 +378,9 @@ export class NexMathParser {
                             for (let existingRow of rows) {
                                 if (newRow.length !== existingRow.length) {
                                     this.tokenStream.throwSyntaxError(
-                                        `All matrix rows must have the same size; incompatible new row of length ${newRow.length} with existing row(s) of length ${existingRow.length}`,
-                                        token
+                                        `All matrix rows must have the same size`,
+                                        token,
+                                        `Incompatible new row of length ${newRow.length} with existing row(s) of length ${existingRow.length}`
                                     );
                                 }
                             }

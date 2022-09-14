@@ -17,6 +17,9 @@ import {
     Callout,
     Bold,
     DesmosElement,
+    Row,
+    Table,
+    Group,
 } from "./ast";
 import { NexMathParser } from "./nex_math/parser";
 import { Setting, SettingHandler } from "./setting_handler";
@@ -296,7 +299,7 @@ export class Parser {
         }
     }
 
-    parseList(indent: number, ordering: ListOrdering[]): List {
+    parseList(indent: number, ordering: ListOrdering[], terminatingToken: TokenType | null): List {
         let listItems: ListItem[] = [];
 
         while (true) {
@@ -325,7 +328,7 @@ export class Parser {
                     );
                 }
 
-                let sublist = this.parseList(nextIndent, ordering);
+                let sublist = this.parseList(nextIndent, ordering, terminatingToken);
                 listItems.push(new ListItem(indent, sublist));
                 continue;
             } else if (nextIndent < indent) {
@@ -334,7 +337,7 @@ export class Parser {
 
             this.tokenStream.consumeToken(listItemToken);
 
-            let element = this.parseNextBlockLevelElement(null);
+            let element = this.parseNextBlockLevelElement(null, terminatingToken);
             if (!element) {
                 this.tokenStream.throwSyntaxError(`Empty list item`, listItemToken);
             }
@@ -413,11 +416,79 @@ export class Parser {
         }
     }
 
+    parseTable(): Table {
+        let rows: Row[] = [];
+
+        while (true) {
+            this.tokenStream.grabOptionalToken(WHITESPACE);
+            if (this.tokenStream.grabOptionalToken(BLOCK_END)) {
+                this.tokenStream.grabToken([WHITESPACE_INCL_NEWLINES, END_OF_FILE]);
+                return new Table(rows);
+            }
+
+            let invalidBlockErrorLocation = this.tokenStream.getCurrentLocation();
+
+            let nextElement = this.parseNextBlockLevelElement(null, BLOCK_END, true);
+
+            if (!nextElement) {
+                continue;
+            }
+
+            if (nextElement instanceof Row) {
+                rows.push(nextElement);
+            } else {
+                this.tokenStream.throwSyntaxError(
+                    `Expected row block, got element of type "${nextElement.elementName}" instead`,
+                    invalidBlockErrorLocation,
+                    `To create a row, use the @row block declaration`
+                );
+            }
+        }
+    }
+
+    parseRow(): Row {
+        let cells: Element[] = [];
+
+        while (true) {
+            this.tokenStream.grabOptionalToken(WHITESPACE);
+            if (this.tokenStream.grabOptionalToken(BLOCK_END)) {
+                this.tokenStream.grabToken([WHITESPACE_INCL_NEWLINES, END_OF_FILE]);
+                return new Row(cells);
+            }
+
+            let nextElement = this.parseNextBlockLevelElement(null, BLOCK_END);
+
+            if (nextElement) {
+                cells.push(nextElement);
+            }
+        }
+    }
+
+    parseGroup(): Group {
+        let group = new Group();
+
+        while (true) {
+            this.tokenStream.grabOptionalToken(WHITESPACE);
+            if (this.tokenStream.grabOptionalToken(BLOCK_END)) {
+                this.tokenStream.grabToken([WHITESPACE_INCL_NEWLINES, END_OF_FILE]);
+                return group;
+            }
+
+            let nextElement = this.parseNextBlockLevelElement(null, BLOCK_END);
+
+            if (nextElement) {
+                group.children.push(nextElement);
+            }
+        }
+    }
+
     parseNextBlockLevelElement(
         settingHandler: SettingHandler | null = null,
-        terminatingToken: TokenType | null = null
+        terminatingToken: TokenType | null = null,
+        tableEnvironment = false
     ): Element | null {
         this.tokenStream.grabOptionalToken(WHITESPACE);
+
         return this.tokenStream.matchTokenAndBranch<Element | null>({
             branches: [
                 {
@@ -493,7 +564,7 @@ export class Parser {
                             );
                         }
 
-                        return this.parseList(1, []);
+                        return this.parseList(1, [], terminatingToken);
                     },
                 },
                 {
@@ -534,7 +605,7 @@ export class Parser {
                             orderingList.push(ordering as ListOrdering);
                         }
 
-                        return this.parseList(1, orderingList);
+                        return this.parseList(1, orderingList, terminatingToken);
                     },
                 },
                 {
@@ -551,6 +622,18 @@ export class Parser {
                                 return this.parseCallout();
                             case "desmos":
                                 return this.parseDesmos();
+                            case "table":
+                                return this.parseTable();
+                            case "row":
+                                if (!tableEnvironment) {
+                                    this.tokenStream.throwSyntaxError(
+                                        `Row block only valid inside of table blocks`,
+                                        token
+                                    );
+                                }
+                                return this.parseRow();
+                            case "group":
+                                return this.parseGroup();
                             default:
                                 this.tokenStream.throwSyntaxError(
                                     `Unrecognized block type "${blockName}"`,

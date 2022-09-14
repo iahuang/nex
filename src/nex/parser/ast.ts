@@ -179,6 +179,32 @@ export enum ListOrdering {
     Numbered = "1",
 }
 
+export class Group extends ContainerElement {
+    elementName = "group";
+}
+
+export class Table extends Element {
+    rows: Row[];
+    elementName = "table";
+
+    constructor(rows: Row[]) {
+        super();
+
+        this.rows = rows;
+    }
+}
+
+export class Row extends Element {
+    cells: Element[];
+    elementName = "row";
+
+    constructor(cells: Element[]) {
+        super();
+
+        this.cells = cells;
+    }
+}
+
 /**
  * Return `text` with all lines indented by `indent * 4` spaces.
  */
@@ -223,5 +249,17 @@ function _dump(element: Element): string {
 
         return out.join("\n");
     }
+
+    if (element instanceof Table) {
+        let out: string[] = ["Table ["];
+
+        for (let row of element.rows) {
+            out.push(_indent(_dump(row), 1) + ",");
+        }
+        out.push("]");
+
+        return out.join("\n");
+    }
+
     return `${element.constructor.name} ${JSON.stringify(element)}`;
 }

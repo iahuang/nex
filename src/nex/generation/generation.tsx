@@ -1,8 +1,10 @@
+import { generateSyntaxErrorPrintout } from "../cli/cli_utils";
 import { ScriptDependency, StylesheetDependency } from "../dependency";
 import { Document } from "../parser/ast";
+import { NexSyntaxError } from "../parser/errors";
 import { resolveResourcePath } from "../resources";
 import { ThemeData } from "../theme";
-import { FsUtil } from "../util";
+import { FsUtil, stripAnsi } from "../util";
 import { ElementBuilder } from "./element_templates";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -31,6 +33,11 @@ const KATEX_FONTS = [
     "fonts/KaTeX_Typewriter-Regular.woff2",
 ];
 
+export interface DocumentUpdateData {
+    bodyHTML: string;
+    javascriptCodeFragment: string;
+}
+
 export class DocumentHTMLGenerator {
     katexStylesheet: StylesheetDependency;
     katexScript: ScriptDependency;
@@ -39,6 +46,8 @@ export class DocumentHTMLGenerator {
 
     highlightScript: ScriptDependency;
     highlightStylesheet: StylesheetDependency;
+
+    googleMaterialSymbols: StylesheetDependency;
 
     constructor() {
         // KATEX
@@ -72,9 +81,22 @@ export class DocumentHTMLGenerator {
         this.highlightScript = new ScriptDependency({
             url: "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.6.0/highlight.min.js",
         });
+
+        // MATERIAL SYMBOLS
+
+        this.googleMaterialSymbols = new StylesheetDependency({
+            path: resolveResourcePath("material_symbols.css"),
+        });
+
+        this.googleMaterialSymbols.addExternalFontDependency("symbols_font", {
+            url: "https://fonts.gstatic.com/s/materialsymbolsoutlined/v52/kJEhBvYX7BgnkSrUwT8OhrdQw4oELdPIeeII9v6oFsLjBuVY.woff2",
+        });
     }
 
-    private async _generateHeader(theme: ThemeData, title: string | null): Promise<HTMLNode> {
+    private async _generateDependencyHeader(
+        theme: ThemeData,
+        title: string | null
+    ): Promise<HTMLNode> {
         let baseCSS = FsUtil.readText(resolveResourcePath("base.css"));
 
         return (
@@ -91,17 +113,55 @@ export class DocumentHTMLGenerator {
         );
     }
 
+    private async _generateLiveDependencyHeader(): Promise<HTMLNode> {
+        let baseCSS = FsUtil.readText(resolveResourcePath("base.css"));
+
+        return (
+            <head>
+                {new HTMLVerbatim("<style>" + baseCSS + "</style>")}
+                {new HTMLVerbatim(await this.katexStylesheet.generateEmbedding())}
+                {new HTMLVerbatim(await this.katexScript.generateEmbedding())}
+                {new HTMLVerbatim(await this.desmosScript.generateEmbedding())}
+                {new HTMLVerbatim(await this.highlightStylesheet.generateEmbedding())}
+                {new HTMLVerbatim(await this.highlightScript.generateEmbedding())}
+                {new HTMLVerbatim(await this.googleMaterialSymbols.generateEmbedding())}
+            </head>
+        );
+    }
+
+    async generateLiveHTMLTemplate(): Promise<string> {
+        let launchScript = FsUtil.readText(resolveResourcePath("document_renderer.js"));
+        let clientScript = FsUtil.readText(resolveResourcePath("live_client.js"));
+        let htmlRoot: HTMLNode = (
+            <html>
+                {await this._generateLiveDependencyHeader()}
+
+                <body>
+                    <noscript>
+                        <div class="noscript-overlay">
+                            JavaScript must be enabled to view this document.
+                        </div>
+                    </noscript>
+                </body>
+                {new HTMLVerbatim("<script>" + launchScript + "</script>")}
+                {new HTMLVerbatim("<script>" + clientScript + "</script>")}
+            </html>
+        );
+
+        return "<!DOCTYPE html>\n" + htmlRoot.asHTML();
+    }
+
     /**
      * Convert the provided document to a standalone HTML
      * and return an HTML string.
      */
     async generateStandaloneHTML(document: Document, themeData: ThemeData): Promise<string> {
-        let launchScript = FsUtil.readText(resolveResourcePath("document_renderer.js"));
+        let rendererScript = FsUtil.readText(resolveResourcePath("document_renderer.js"));
         let elementBuilder = new ElementBuilder();
 
         let htmlRoot: HTMLNode = (
             <html>
-                {await this._generateHeader(themeData, document.title)}
+                {await this._generateDependencyHeader(themeData, document.title)}
 
                 <body>
                     <noscript>
@@ -120,10 +180,189 @@ export class DocumentHTMLGenerator {
                             "</script>"
                     )
                 }
-                {new HTMLVerbatim("<script>" + launchScript + "</script>")}
+                {new HTMLVerbatim("<script>" + rendererScript + "</script>")}
+                {new HTMLVerbatim("<script>renderDocument();</script>")}
             </html>
         );
 
         return "<!DOCTYPE html>\n" + htmlRoot.asHTML();
+    }
+
+    private _generateBackButtonHeader(parentDirectory: string): HTMLNode {
+        return (
+            <div class="dir-header" onclick={`requestOpen('${parentDirectory}')`}>
+                <span class="dir-vcenter">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                    Return to parent directory
+                </span>
+            </div>
+        );
+    }
+
+    async generateLiveDocumentUpdateData(
+        document: Document,
+        themeData: ThemeData,
+        parentDirectory: string
+    ): Promise<DocumentUpdateData> {
+        let elementBuilder = new ElementBuilder();
+        let themeStylesheet = "<style>" + themeData.getPackedCSS() + "</style>";
+        let header: HTMLNode = this._generateBackButtonHeader(parentDirectory);
+        return {
+            bodyHTML:
+                header.asHTML() +
+                themeStylesheet +
+                elementBuilder.elementAsHTMLNode(document).asHTML(),
+            javascriptCodeFragment:
+                "window.documentMetadata=" +
+                elementBuilder.metadata.asJSONString() +
+                "; renderDocument();",
+        };
+    }
+
+    generateLiveDirectoryBody(path: string): DocumentUpdateData {
+        let files = FsUtil.listDir(path, {
+            includeSymlinks: true,
+            mode: "both",
+        });
+
+        // remove .DS_Store
+        files = files.filter((path) => {
+            return FsUtil.entityName(path) !== ".DS_Store";
+        });
+
+        let element: HTMLNode = (
+            <div class="dir">
+                <h1>{path}</h1>
+                <div
+                    class={"dir-vcenter dir-item dir-clickable"}
+                    onclick={`requestOpen('${FsUtil.dirname(path)}');`}
+                >
+                    <span class="material-symbols-outlined">arrow_upward</span>&nbsp;&nbsp;..
+                </div>
+                {files.map((filePath) => {
+                    let fileIcon = "draft";
+                    let entityName = FsUtil.entityName(filePath);
+                    let clickable = false;
+                    let isNexFile = false;
+
+                    if (FsUtil.isDirectory(filePath)) {
+                        fileIcon = "folder";
+                        clickable = true;
+
+                        if (entityName.startsWith(".")) {
+                            fileIcon = "folder_special";
+                        }
+                    }
+
+                    let fileExtension = FsUtil.getFileExtension(filePath)?.toLowerCase();
+
+                    // Set custom file icons depending on file extension
+
+                    if ([".zip", ".rar", ".tar", ".gz", ".7z"].includes(fileExtension!)) {
+                        fileIcon = "folder_zip";
+                    }
+
+                    if ([".jpg", ".png", ".gif", ".bmp", ".tiff"].includes(fileExtension!)) {
+                        fileIcon = "image";
+                    }
+
+                    if ([".app", ".exe", ".bin", ".o", ".sh", ".bat"].includes(fileExtension!)) {
+                        fileIcon = "terminal";
+                    }
+
+                    if ([".pdf", ".txt", ".md"].includes(fileExtension!)) {
+                        fileIcon = "description";
+                    }
+
+                    if (
+                        [
+                            ".py",
+                            ".ts",
+                            ".js",
+                            ".html",
+                            ".c",
+                            ".cpp",
+                            ".h",
+                            ".rb",
+                            ".rust",
+                            ".go",
+                            ".java",
+                            ".d",
+                            ".cs",
+                            ".swift",
+                            ".php",
+                            ".asm",
+                            ".json",
+                            ".yml",
+                            ".xml",
+                        ].includes(fileExtension!)
+                    ) {
+                        fileIcon = "data_object";
+                    }
+
+                    if (
+                        [".mov", ".mp4", ".wmv", ".avi", ".webm", ".mkv"].includes(fileExtension!)
+                    ) {
+                        fileIcon = "movie";
+                    }
+
+                    if (fileExtension === ".nex") {
+                        fileIcon = "file_open";
+                        clickable = true;
+                        isNexFile = true;
+                    }
+
+                    // Prevent access for items that this process doesn't have permission to read
+
+                    if (!FsUtil.isAccessible(filePath)) {
+                        fileIcon = "block";
+                        clickable = false;
+                    }
+
+                    let classes = ["dir-vcenter", "dir-item"];
+
+                    if (clickable) {
+                        classes.push("dir-clickable");
+                    } else {
+                        classes.push("dir-disabled");
+                    }
+
+                    if (isNexFile) {
+                        classes.push("dir-nex-file");
+                    }
+
+                    return (
+                        <div
+                            class={classes.join(" ")}
+                            onclick={clickable ? `requestOpen('${filePath}');` : ""}
+                        >
+                            <span class="material-symbols-outlined">{fileIcon}</span>&nbsp;&nbsp;
+                            {FsUtil.entityName(filePath)}
+                        </div>
+                    );
+                })}
+            </div>
+        );
+
+        return {
+            bodyHTML: element.asHTML(),
+            javascriptCodeFragment: "",
+        };
+    }
+
+    generateLiveErrorBody(error: NexSyntaxError, parentDirectory: string): DocumentUpdateData {
+        let element: HTMLNode = (
+            <div>
+                {this._generateBackButtonHeader(parentDirectory)}
+                <pre>
+                    <code>{stripAnsi(generateSyntaxErrorPrintout(error))}</code>
+                </pre>
+            </div>
+        );
+
+        return {
+            bodyHTML: element.asHTML(),
+            javascriptCodeFragment: "",
+        };
     }
 }

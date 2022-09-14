@@ -9,6 +9,7 @@ export interface Mode {
     options: Option[];
     requiresInput: boolean;
     inputDescription?: string;
+    defaultInput?: string;
 }
 
 export interface Option {
@@ -167,9 +168,15 @@ export function parseArgv(
     // ensure input is present, if required
     if (selectedMode.requiresInput) {
         if (!input) {
-            return {
-                result: null,
-                error: `Mode "${modeName}" requires an input: [${selectedMode.inputDescription ?? ""}]`
+            if (selectedMode.defaultInput) {
+                input = selectedMode.defaultInput;
+            } else {
+                return {
+                    result: null,
+                    error: `Mode "${modeName}" requires an input: [${
+                        selectedMode.inputDescription ?? ""
+                    }]`,
+                };
             }
         }
     }
