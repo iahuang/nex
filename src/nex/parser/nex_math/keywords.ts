@@ -179,7 +179,6 @@ export class NexMathKeywords {
                 .addKeyword("'", "'")
                 .addKeyword(":", ":")
                 .addKeyword("!", "!")
-                .addKeyword("carat", "\\^")
                 .addKeyword("*", "\\cdot")
                 .addKeyword("cross", "\\times")
                 .addKeyword("star", "*")
@@ -224,7 +223,7 @@ export class NexMathKeywords {
                 .addKeyword("ln", "\\ln")
                 .addKeyword("sqrt", "\\sqrt{$0}", { maxArguments: 1 })
                 .addKeyword("abs", "\\left|$0\\right|", { maxArguments: 1 })
-                .addKeyword("norm", "\\left\\Vert$0\\right\\Vert", { maxArguments: 1 })
+                .addKeyword("norm", "\\left\\Vert $0\\right\\Vert", { maxArguments: 1 })
                 .addKeyword("radical", "\\sqrt[$0]{$1}", { maxArguments: 2 })
                 .addKeyword("sum", "\\displaystyle\\sum_{$0}^{$1}", {
                     maxArguments: 2,
