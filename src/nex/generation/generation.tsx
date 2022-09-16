@@ -79,7 +79,7 @@ export class DocumentHTMLGenerator {
         });
 
         this.highlightScript = new ScriptDependency({
-            url: "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.6.0/highlight.min.js",
+            path: resolveResourcePath("lib/highlight.min.js")
         });
 
         // MATERIAL SYMBOLS
