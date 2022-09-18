@@ -146,6 +146,8 @@ export class NexMathKeywords {
                 .addKeyword("emptyset", "\\varnothing")
                 .addKeyword("union", "\\cup")
                 .addKeyword("intersection", "\\cap")
+                .addKeyword("cup", "\\cup")
+                .addKeyword("cap", "\\cap")
                 // Logic
                 .addKeyword("not", "\\neg")
                 .addKeyword("and", "\\land")
@@ -171,12 +173,15 @@ export class NexMathKeywords {
                 .addKeyword("!=", "\\neq")
                 .addKeyword("congruent", "\\cong")
                 // Special chracters
+                .addKeyword("~", "~~")
+                .addKeyword("\\,", "\\,")
                 .addKeyword("+", "+")
                 .addKeyword("-", "-")
                 .addKeyword(">", ">")
                 .addKeyword("<", "<")
                 .addKeyword(",", ",\\,")
                 .addKeyword("'", "'")
+                .addKeyword("''", "''")
                 .addKeyword(":", ":")
                 .addKeyword("!", "!")
                 .addKeyword("*", "\\cdot")
@@ -221,7 +226,7 @@ export class NexMathKeywords {
                 // Misc functions and argumented notation
                 .addKeyword("log", "\\log")
                 .addKeyword("ln", "\\ln")
-                .addKeyword("sqrt", "\\sqrt{$0}", { maxArguments: 1 })
+                .addKeyword("sqrt", "\\sqrt{$0}", { maxArguments: 1, large: true })
                 .addKeyword("abs", "\\left|$0\\right|", { maxArguments: 1 })
                 .addKeyword("norm", "\\left\\Vert $0\\right\\Vert", { maxArguments: 1 })
                 .addKeyword("radical", "\\sqrt[$0]{$1}", { maxArguments: 2 })
@@ -261,6 +266,14 @@ export class NexMathKeywords {
                     maxArguments: 2,
                     large: true,
                 })
+                .addKeyword("bigcup", "\\displaystyle\\bigcup_{$0}^{$1}", {
+                    maxArguments: 2,
+                    large: true,
+                })
+                .addKeyword("bigcap", "\\displaystyle\\bigcap_{$0}^{$1}", {
+                    maxArguments: 2,
+                    large: true,
+                })
                 .addKeyword("eval", "\\Big|_{$0}^{$1}", { maxArguments: 2, large: true })
                 .addKeyword("max", "\\max")
                 .addKeyword("min", "\\min")
@@ -276,7 +289,10 @@ export class NexMathKeywords {
                 .addKeyword("\\(", "(")
                 .addKeyword("\\)", ")")
                 .addKeyword("\\[", "[")
-                .addKeyword("\\]", "]");
+                .addKeyword("\\]", "]")
+                // Temporary
+                .addKeyword("cal", "\\mathcal{$0}", {maxArguments: 1, minArguments: 1})
+                .addKeyword("bb", "\\mathbb{$0}", {maxArguments: 1, minArguments: 1});
         }
         return this._instance;
     }
