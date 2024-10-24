@@ -32,7 +32,17 @@ export const NM_KEYWORD = new TokenType("keyword", {
 
 export const NM_ARGUMENT_SEPARATOR = new TokenType("argument separator", { pattern: "," });
 
-export const NM_MATRIX_START = new TokenType("matrix", { pattern: "mat(" });
+export const NM_BMATRIX_START = new TokenType("matrix", { pattern: "mat[" });
+export const NM_BMATRIX_END = new TokenType("matrix", { pattern: "]" });
+
+export const NM_PMATRIX_START = new TokenType("matrix", { pattern: "mat(" });
+export const NM_PMATRIX_END = new TokenType("matrix", { pattern: ")" });
+
+export const NM_CMATRIX_START = new TokenType("matrix", { pattern: "mat{" });
+export const NM_CMATRIX_END = new TokenType("matrix", { pattern: "}" });
+
+export const NM_VMATRIX_START = new TokenType("matrix", { pattern: "mat|" });
+export const NM_VMATRIX_END = new TokenType("matrix", { pattern: "|" });
 
 export const NM_CASES_START = new TokenType("cases", { pattern: "cases(" });
 export const NM_CASES_WHEN = new TokenType("when", { regex: /^when(?= )/g });

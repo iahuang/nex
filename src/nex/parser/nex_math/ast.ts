@@ -204,10 +204,12 @@ export class KeywordNode extends MathNode {
 
 export class Matrix extends MathNode {
     rows: MathNode[][];
+    type: string;
 
-    constructor(rows: MathNode[][]) {
+    constructor(rows: MathNode[][], type: string) {
         super();
         this.rows = rows;
+        this.type = type;
     }
 
     asLatex(): string {
@@ -215,7 +217,7 @@ export class Matrix extends MathNode {
             .map((row) => row.map((cell) => cell.asLatex()).join(" & "))
             .join("\\\\");
 
-        return `\\begin{bmatrix}${content}\\end{bmatrix}`;
+        return `\\begin{${this.type}}${content}\\end{${this.type}}`;
     }
 
     isVerticallyLarge(): boolean {

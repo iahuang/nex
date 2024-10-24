@@ -29,12 +29,19 @@ import {
     NM_EXPONENT,
     NM_FRAC,
     NM_KEYWORD,
-    NM_MATRIX_START,
+    NM_BMATRIX_START,
     NM_PAREN_LEFT,
     NM_PAREN_RIGHT,
     NM_SUBSCRIPT,
     NM_TEXT_END,
     NM_TEXT_START,
+    NM_PMATRIX_START,
+    NM_CMATRIX_START,
+    NM_VMATRIX_START,
+    NM_BMATRIX_END,
+    NM_PMATRIX_END,
+    NM_CMATRIX_END,
+    NM_VMATRIX_END,
 } from "./token_types";
 
 export class NexMathParser {
@@ -54,7 +61,10 @@ export class NexMathParser {
                 );
             let nextToken = this.tokenStream.matchToken([
                 !previousCharacterIsLetter && NM_KEYWORD,
-                !previousCharacterIsLetter && NM_MATRIX_START,
+                !previousCharacterIsLetter && NM_BMATRIX_START,
+                !previousCharacterIsLetter && NM_PMATRIX_START,
+                !previousCharacterIsLetter && NM_CMATRIX_START,
+                !previousCharacterIsLetter && NM_VMATRIX_START,
                 !previousCharacterIsLetter && NM_CASES_START,
                 NM_ALPHANUMERIC,
             ]);
@@ -164,10 +174,31 @@ export class NexMathParser {
                     },
                 },
                 {
-                    tokenType: NM_MATRIX_START,
+                    tokenType: NM_BMATRIX_START,
                     consumeToken: true,
                     handler: () => {
-                        return this.parseMatrix(inline);
+                        return this.parseMatrix(inline, "bmatrix", NM_BMATRIX_END);
+                    },
+                },
+                {
+                    tokenType: NM_PMATRIX_START,
+                    consumeToken: true,
+                    handler: () => {
+                        return this.parseMatrix(inline, "pmatrix", NM_PMATRIX_END);
+                    },
+                },
+                {
+                    tokenType: NM_CMATRIX_START,
+                    consumeToken: true,
+                    handler: () => {
+                        return this.parseMatrix(inline, "Bmatrix", NM_CMATRIX_END);
+                    },
+                },
+                {
+                    tokenType: NM_VMATRIX_START,
+                    consumeToken: true,
+                    handler: () => {
+                        return this.parseMatrix(inline, "vmatrix", NM_VMATRIX_END);
                     },
                 },
                 {
@@ -348,7 +379,7 @@ export class NexMathParser {
         return row;
     }
 
-    parseMatrix(inline: boolean): Matrix {
+    parseMatrix(inline: boolean, type: string, matrixCloser: TokenType): Matrix {
         let rows: Expression[][] = [];
 
         while (true) {
@@ -388,7 +419,7 @@ export class NexMathParser {
                         },
                     },
                     {
-                        tokenType: NM_PAREN_RIGHT,
+                        tokenType: matrixCloser,
                         consumeToken: true,
                         handler: (token) => {
                             // validate that this matrix has at least one row
@@ -399,7 +430,7 @@ export class NexMathParser {
                                 );
                             }
 
-                            return new Matrix(rows);
+                            return new Matrix(rows, type);
                         },
                     },
                 ],

@@ -7,6 +7,8 @@
  * For instance, `>=` gets translated into `\geq`.
  */
 
+const ALPHANUMERIC = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
 export class NexMathKeyword {
     keyword: string;
     latexTemplate: string;
@@ -298,8 +300,16 @@ export class NexMathKeywords {
                 .addKeyword("\\[", "[")
                 .addKeyword("\\]", "]")
                 // Temporary
-                .addKeyword("cal", "\\mathcal{$0}", {maxArguments: 1, minArguments: 1})
-                .addKeyword("bb", "\\mathbb{$0}", {maxArguments: 1, minArguments: 1});
+                .addKeyword("cal", "\\mathcal{$0}", { maxArguments: 1, minArguments: 1 })
+                .addKeyword("bb", "\\mathbb{$0}", { maxArguments: 1, minArguments: 1 });
+
+            for (const c of ALPHANUMERIC) {
+                this._instance.addKeyword("bb" + c, "\\mathbb{" + c.toUpperCase() + "}");
+                this._instance.addKeyword("cal" + c, "\\mathcal{" + c.toUpperCase() + "}");
+                this._instance.addKeyword("frak" + c, "\\mathfrak{" + c.toUpperCase() + "}");
+                this._instance.addKeyword("scr" + c, "\\mathscr{" + c.toUpperCase() + "}");
+                this._instance.addKeyword("bf" + c, "\\mathbf{" + c + "}");
+            }
         }
         return this._instance;
     }
