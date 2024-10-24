@@ -197,6 +197,7 @@ export class NexMathKeywords {
                 .addKeyword("=", "=")
                 .addKeyword("...", "\\dots")
                 .addKeyword("plusminus", "\\pm")
+                .addKeyword("transpose", "^\\top")
                 // Trigonometric
                 .addKeyword("cos", "\\cos")
                 .addKeyword("sin", "\\sin")

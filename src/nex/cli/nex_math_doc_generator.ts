@@ -36,7 +36,7 @@ export function generateNeXMathDocumentation(): string {
         output.writeln("@row {");
         output.writeln("`" + example + "`");
         output.writeln("");
-        output.writeln("${" + example + "}");
+        output.writeln("%{" + example + "}");
         output.writeln("}");
     }
 
@@ -84,7 +84,7 @@ export function generateNeXMathDocumentation(): string {
         output.writeln("");
         output.writeln("`" + template + "`");
         output.writeln("");
-        output.writeln("${" + example + "}");
+        output.writeln("%{" + example + "}");
         output.writeln("");
         if (keyword.maxArguments > 0) {
             output.writeln(`Yes (max ${keyword.maxArguments} arguments)`);

@@ -23,7 +23,7 @@ export class LiveServer {
 
     clients: WebSocket[];
 
-    constructor() {
+    constructor(public themeName: string) {
         this.themeManager = new ThemeManager();
 
         // https://stackoverflow.com/a/51476990
@@ -73,7 +73,7 @@ export class LiveServer {
     }
 
     private async _generateDocumentData(documentPath: string): Promise<DocumentUpdateData> {
-        let theme = this.themeManager.loadTheme(DEFAULT_THEME);
+        let theme = this.themeManager.loadTheme(this.themeName);
         let startTimeMs = Date.now();
         let parser = new Parser(SourceReference.fromPath(documentPath));
         let document: Document;

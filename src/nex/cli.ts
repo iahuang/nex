@@ -63,6 +63,13 @@ const cliSchema: CLISchema = {
                     requiresArgument: true,
                     allowDuplicates: false,
                 },
+                {
+                    name: "theme",
+                    description: "Specify theme (default: latex)",
+                    argumentDescription: "theme",
+                    requiresArgument: true,
+                    allowDuplicates: false,
+                },
             ],
         },
         {
@@ -179,7 +186,11 @@ export async function runCLI(argv: string[]): Promise<void> {
         }
         case "live": {
             let portSetting = settings.getOptionSetting("port");
-            startLiveServer(parseResult.input!, portSetting ? Number.parseInt(portSetting) : null);
+            startLiveServer(
+                parseResult.input!,
+                portSetting ? Number.parseInt(portSetting) : null,
+                settings.getOptionSetting("theme") ?? DEFAULT_THEME
+            );
             break;
         }
         case "list-themes":
@@ -248,8 +259,12 @@ function listThemes(themeManager: ThemeManager): void {
     process.stdout.write(output.read());
 }
 
-async function startLiveServer(inputDirectory: string, port: number | null): Promise<void> {
-    let liveServer = new LiveServer();
+async function startLiveServer(
+    inputDirectory: string,
+    port: number | null,
+    theme: string
+): Promise<void> {
+    let liveServer = new LiveServer(theme);
     liveServer.setCurrentPath(inputDirectory);
 
     console.clear();
