@@ -41,7 +41,7 @@ export const INLINE_CODE_END = new TokenType("inline code end", { pattern: "`" }
 export const INLINE_MATH_START = new TokenType("inline math start", { regex: /^\$(?=.+\$)/g });
 export const INLINE_MATH_END = new TokenType("inline math end", { pattern: "$" });
 
-export const BLOCK_MATH_START = new TokenType("block math start", { regex: /^%{/g });
+export const BLOCK_MATH_START = new TokenType("block math start", { regex: /^\${/g });
 export const BLOCK_MATH_END = new TokenType("block math end", { regex: /^}/g });
 
 export const BLOCK_DECLARATION = new TokenType("block declaration", { regex: /^@\w+/g });

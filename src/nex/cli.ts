@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { CLISchema, parseArgv } from "./cli/argv_parser";
 import { buildStandalone } from "./cli/build";
-import { printHelpMessage } from "./cli/cli_utils";
+import { generateSyntaxErrorPrintout, printHelpMessage } from "./cli/cli_utils";
 import { generateNeXMathDocumentation } from "./cli/nex_math_doc_generator";
 import { DocumentHTMLGenerator } from "./generation/generation";
 import { LiveServer } from "./live_server";
@@ -12,6 +12,7 @@ import { SourceReference } from "./source";
 import { DEFAULT_THEME, ThemeManager } from "./theme";
 import { FsUtil, StringBuffer } from "./util";
 import open from "open";
+import { NexSyntaxError } from "./parser/errors";
 
 const DEFAULT_PORT = 3000;
 
@@ -104,6 +105,21 @@ const cliSchema: CLISchema = {
             requiresInput: false,
             options: [],
         },
+        {
+            name: "parse",
+            description: "Parse a NeX file and output the AST as JSON",
+            requiresInput: true,
+            inputDescription: "file",
+            options: [
+                {
+                    name: "debug",
+                    description: "Output additional information for debug purposes",
+                    argumentDescription: "mode",
+                    requiresArgument: true,
+                    allowDuplicates: false,
+                },
+            ],
+        },
     ],
 };
 
@@ -175,6 +191,29 @@ export async function runCLI(argv: string[]): Promise<void> {
         case "clear-cache":
             clearCache();
             console.log(chalk.green("Cache cleared"));
+            break;
+        case "parse":
+            if (!FsUtil.exists(parseResult.input!)) {
+                panic("No such file or directory");
+            }
+
+            let parser = new Parser(SourceReference.fromPath(parseResult.input!));
+            try {
+                let document = parser.parse();
+                console.log(JSON.stringify(document, null, 2));
+            } catch (e) {
+                if (e instanceof NexSyntaxError) {
+                    console.log(generateSyntaxErrorPrintout(e));
+
+                    if (settings.getOptionSetting("debug") !== null) {
+                        console.error(chalk.dim(chalk.redBright(e.stack)));
+                    }
+
+                    process.exit(1);
+                } else {
+                    throw e;
+                }
+            }
             break;
     }
 }

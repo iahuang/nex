@@ -498,6 +498,7 @@ export class Parser {
                         let headerDepth = token.content.length;
 
                         let header = new Header(headerDepth, []);
+                        this.tokenStream.grabOptionalToken(WHITESPACE);
 
                         while (true) {
                             let textual = this.parseNextTextualElement(ITALIC_END);

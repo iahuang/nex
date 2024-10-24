@@ -227,3 +227,4 @@ export class TokenStream {
         throw new NexSyntaxError(where ?? this.getCurrentLocation(), message, undefined, note);
     }
 }
+
